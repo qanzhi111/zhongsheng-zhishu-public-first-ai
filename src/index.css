@@ -1,0 +1,164 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: oklch(0.1771 0.0164 284.5989);
+  --foreground: oklch(0.9595 0.0200 286.0164);
+  --card: oklch(0.2128 0.0157 284.9908);
+  --card-foreground: oklch(0.9595 0.0200 286.0164);
+  --popover: oklch(0.1771 0.0164 284.5989);
+  --popover-foreground: oklch(0.9595 0.0200 286.0164);
+  --primary: oklch(0.9054 0.1546 194.7689);
+  --primary-foreground: oklch(0.1771 0.0164 284.5989);
+  --secondary: oklch(0.2912 0.0254 284.7152);
+  --secondary-foreground: oklch(0.9595 0.0200 286.0164);
+  --muted: oklch(0.2912 0.0254 284.7152);
+  --muted-foreground: oklch(0.7107 0.0231 285.7983);
+  --accent: oklch(0.9680 0.2110 109.7692);
+  --accent-foreground: oklch(0.1771 0.0164 284.5989);
+  --destructive: oklch(0.6539 0.2026 26.8577);
+  --destructive-foreground: oklch(0.1771 0.0164 284.5989);
+  --border: oklch(0.2912 0.0254 284.7152);
+  --input: oklch(0.2912 0.0254 284.7152);
+  --ring: oklch(0.9054 0.1546 194.7689);
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius: 0.75rem;
+  --shadow-2xs: 0px 0px 20px 2px hsl(180 100% 50% / 0.07);
+  --shadow-xs: 0px 0px 20px 2px hsl(180 100% 50% / 0.07);
+  --shadow-sm: 0px 0px 20px 2px hsl(180 100% 50% / 0.15);
+  --shadow: 0px 0px 20px 2px hsl(180 100% 50% / 0.15);
+  --shadow-md: 0px 0px 20px 2px hsl(180 100% 50% / 0.20);
+  --shadow-lg: 0px 0px 20px 2px hsl(180 100% 50% / 0.20);
+  --shadow-xl: 0px 0px 20px 2px hsl(180 100% 50% / 0.25);
+  --shadow-2xl: 0px 0px 20px 2px hsl(180 100% 50% / 0.25);
+  --tracking-normal: 0.025em;
+  --spacing: 0.25rem;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--foreground);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: var(--tracking-normal);
+}
+
+/* Particle animation background */
+.particle-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 50%;
+  opacity: 0.5;
+  animation: float 15s infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  90% {
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-100vh) translateX(50px);
+  }
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(29, 31, 53, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Fade in animation */
+.fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Button effects */
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-glow:hover::before {
+  left: 100%;
+}
