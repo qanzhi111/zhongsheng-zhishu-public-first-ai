@@ -1,0 +1,367 @@
+/* App全局样式 */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 布局样式 */
+.app-layout {
+  min-height: 100vh;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 0 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-header h1 {
+  color: white;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.app-header .subtitle {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  margin-left: 12px;
+}
+
+.app-sider {
+  background: white !important;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+}
+
+.app-content {
+  background: #f0f2f5;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* 菜单样式 */
+.app-menu {
+  border-right: none;
+  height: calc(100vh - 64px);
+}
+
+.app-menu .ant-menu-item {
+  margin: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.app-menu .ant-menu-item:hover {
+  background: #e6f7ff;
+}
+
+.app-menu .ant-menu-item-selected {
+  background: #1890ff !important;
+  color: white !important;
+}
+
+.app-menu .ant-menu-item-selected:hover {
+  background: #40a9ff !important;
+}
+
+/* 徽章样式 */
+.ant-badge-count {
+  box-shadow: none;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 16px;
+  }
+  
+  .app-header h1 {
+    font-size: 18px;
+  }
+  
+  .app-header .subtitle {
+    display: none;
+  }
+  
+  .app-content {
+    padding: 0;
+  }
+}
+
+/* 加载动画 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* 页面容器通用样式 */
+.page-container {
+  padding: 24px;
+  background: #f0f2f5;
+  min-height: 100vh;
+}
+
+/* 卡片通用样式 */
+.page-card {
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.3s;
+}
+
+.page-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 按钮样式 */
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #5568d3 0%, #6a3de8 100%);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.6);
+}
+
+/* 标签样式 */
+.tag-success {
+  background: #f6ffed;
+  border-color: #b7eb8f;
+  color: #52c41a;
+}
+
+.tag-warning {
+  background: #fffbe6;
+  border-color: #ffe58f;
+  color: #faad14;
+}
+
+.tag-danger {
+  background: #fff2f0;
+  border-color: #ffccc7;
+  color: #ff4d4f;
+}
+
+.tag-info {
+  background: #e6f7ff;
+  border-color: #91d5ff;
+  color: #1890ff;
+}
+
+/* 表格样式增强 */
+.ant-table-wrapper {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 分页器样式 */
+.ant-pagination {
+  margin: 16px 0;
+  text-align: center;
+}
+
+/* 模态框样式 */
+.ant-modal-content {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ant-modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.ant-modal-header .ant-modal-title {
+  color: white;
+  font-weight: 600;
+}
+
+.ant-modal-close-x {
+  color: white;
+}
+
+/* 表单样式 */
+.ant-form-item-label > label {
+  font-weight: 500;
+}
+
+/* 统计数字样式 */
+.ant-statistic-title {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.ant-statistic-content-value {
+  font-weight: 600;
+  font-size: 28px;
+}
+
+/* 徽章样式 */
+.ant-badge-status-text {
+  font-size: 12px;
+}
+
+/* 进度条样式 */
+.ant-progress-text {
+  font-weight: 500;
+}
+
+/* 折叠面板样式 */
+.ant-collapse {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* 时间线样式 */
+.ant-timeline {
+  padding: 20px 0;
+}
+
+/* 警告提示样式 */
+.ant-alert {
+  border-radius: 6px;
+}
+
+/* 空状态样式 */
+.ant-empty-description {
+  color: #8c8c8c;
+}
+
+/* 动画效果 */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* 打印样式 */
+@media print {
+  .app-header,
+  .app-sider,
+  .no-print {
+    display: none !important;
+  }
+  
+  .app-content {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* 辅助类 */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+
+.mb-1 {
+  margin-bottom: 8px;
+}
+
+.mb-2 {
+  margin-bottom: 16px;
+}
+
+.mb-3 {
+  margin-bottom: 24px;
+}
+
+.mt-0 {
+  margin-top: 0;
+}
+
+.mt-1 {
+  margin-top: 8px;
+}
+
+.mt-2 {
+  margin-top: 16px;
+}
+
+.mt-3 {
+  margin-top: 24px;
+}
+
+.p-0 {
+  padding: 0;
+}
+
+.p-1 {
+  padding: 8px;
+}
+
+.p-2 {
+  padding: 16px;
+}
+
+.p-3 {
+  padding: 24px;
+}

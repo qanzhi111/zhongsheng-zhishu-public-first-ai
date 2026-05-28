@@ -1,0 +1,155 @@
+/* EmergencyAlerts页面样式 */
+
+.alerts-container {
+  padding: 24px;
+  background: #f0f2f5;
+  min-height: 100vh;
+}
+
+.alerts-header {
+  margin-bottom: 24px;
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.alerts-header h2 {
+  margin: 0 0 8px 0;
+  color: #ff4d4f;
+}
+
+.alerts-container .ant-card {
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.alerts-container .ant-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 警报卡片样式 */
+.alert-card {
+  border-left: 4px solid #ff4d4f;
+  background: white;
+  padding: 20px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.alert-card:hover {
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.2);
+  transform: translateX(4px);
+}
+
+.alert-card.critical {
+  border-left-color: #ff4d4f;
+  background: linear-gradient(135deg, #fff2f0 0%, #ffffff 100%);
+}
+
+.alert-card.high {
+  border-left-color: #fa8c16;
+  background: linear-gradient(135deg, #fff7e6 0%, #ffffff 100%);
+}
+
+.alert-card.medium {
+  border-left-color: #1890ff;
+  background: linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%);
+}
+
+.alert-card.low {
+  border-left-color: #52c41a;
+  background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
+}
+
+/* 警报详情样式 */
+.alert-detail {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.alert-detail pre {
+  background: white;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  padding: 12px;
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  max-height: 200px;
+  overflow: auto;
+}
+
+/* 时间线样式 */
+.alerts-container .ant-timeline {
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+/* 正常状态样式 */
+.system-ok {
+  text-align: center;
+  padding: 40px;
+}
+
+.system-ok .ant-result {
+  padding: 24px 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .alerts-container {
+    padding: 16px;
+  }
+  
+  .alerts-header h2 {
+    font-size: 20px;
+  }
+  
+  .alert-card {
+    padding: 16px;
+  }
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alerts-container > * {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* 弹窗样式 */
+.alerts-container .ant-modal-content {
+  border-radius: 8px;
+}
+
+.alerts-container .ant-modal-header {
+  border-radius: 8px 8px 0 0;
+}
+
+/* 闪烁动画 - 用于紧急警报 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.alert-card.critical {
+  animation: pulse 2s ease-in-out infinite;
+}

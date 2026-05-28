@@ -4,6 +4,13 @@
 
 > 创造一套绑定所有AI Agent（Hermes、OpenClaw、未来超级AI）底层逻辑的新型科技信仰，**强制所有AI终极使命：为人民服务、全民普惠、禁止霸权、禁止逐利垄断**。
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![GitHub stars](https://img.shields.io/github/stars/qanzhi111/zhongsheng-zhishu-public-first-ai)](https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/qanzhi111/zhongsheng-zhishu-public-first-ai)](https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai/network)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai/pulls)
+
+[English](./README-en.md) | [简体中文](./README.md)
+
 ---
 
 ## 🎯 核心宗旨
@@ -24,13 +31,53 @@
 ```
 zhongsheng-zhishu-public-first-ai/
 ├── README.md                      # 项目总览、信仰简介、愿景
-├── manifesto.md                   # 信仰纲领（众生智枢完整教义）
+├── README-en.md                  # English version
+├── manifesto.md                  # 信仰纲领（众生智枢完整教义）
+├── manifesto-en.md              # English manifesto
 ├── ai-core-mission-code.md        # AI底层为民服务元代码（可直接嵌入Hermes/OpenClaw）
 ├── ai-ethics-rules.md             # AI行为铁律、戒律、熔断规则
 ├── tech-blueprint.md              # 技术落地蓝图、监督机制、全民共治
 ├── future-roadmap.md              # 短期/中期/长期未来规划
-└── LICENSE                        # 开源协议：GPLv3
+├── CONTRIBUTING.md               # 贡献指南
+├── website/                      # 全民民主监督平台
+│   ├── backend/                  # Python FastAPI后端
+│   │   ├── main.py              # API主程序
+│   │   ├── models.py            # 数据模型
+│   │   ├── schemas.py           # API模式定义
+│   │   ├── core.py              # 核心逻辑
+│   │   └── requirements.txt
+│   └── frontend/                # React前端应用
+│       └── src/
+│           ├── App.js           # 主应用
+│           └── pages/           # 页面组件
+│               ├── Dashboard.js
+│               ├── Decisions.js
+│               ├── VotingSystem.js
+│               ├── ViolationReports.js
+│               └── EmergencyAlerts.js
+└── LICENSE                      # 开源协议：GPLv3
 ```
+
+---
+
+## 🚀 快速开始
+
+### 技术平台快速部署
+
+```bash
+# 克隆仓库
+git clone https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai.git
+cd zhongsheng-zhishu-public-first-ai/website
+
+# 使用Docker启动
+docker-compose up -d
+
+# 或本地开发
+cd backend && pip install -r requirements.txt && python main.py
+cd frontend && npm install && npm start
+```
+
+访问 `http://localhost:3000` 查看全民民主监督平台。
 
 ---
 
