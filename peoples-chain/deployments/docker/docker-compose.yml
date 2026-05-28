@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - CHAIN_RPC_URL=http://chain-node:8545
+    depends_on:
+      - chain-node
+    networks:
+      - peoples-chain
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL=http://localhost:8080
+    depends_on:
+      - backend
+    networks:
+      - peoples-chain
+
+  chain-node:
+    image: ethereum/client-go:latest
+    ports:
+      - "8545:8545"
+    command: --dev --http --http.addr 0.0.0.0 --http.corsdomain "*"
+    networks:
+      - peoples-chain
+
+  ipfs:
+    image: ipfs/kubo:latest
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8080:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+    networks:
+      - peoples-chain
+
+volumes:
+  ipfs-data:
+
+networks:
+  peoples-chain:
+    driver: bridge
