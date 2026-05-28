@@ -1,0 +1,77 @@
+name: "🔒 安全漏洞报告"
+description: "报告安全漏洞（请勿在公开渠道讨论安全问题）"
+title: "[Security] "
+labels: ["security"]
+assignees: []
+projects: []
+milestone: ""
+# 安全问题应该私下报告，不使用模板
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🔒 安全漏洞报告
+
+        ⚠️ **重要提示：这是一个敏感的安全问题。**
+
+        请通过以下方式私下报告：
+        
+        📧 **安全邮箱：security@zhongshengzhishu.org**
+        
+        请勿在公开的Issue或Discussion中讨论安全问题！
+
+        ---
+
+        如果您已经通过邮件联系，请在下方简要说明（不包含敏感信息）：
+
+  - type: input
+    id: reported-date
+    attributes:
+      label: "邮件报告日期"
+      description: "您发送安全报告的日期"
+      placeholder: "例如：2026-05-28"
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "问题摘要"
+      description: "简要描述漏洞类型（不包含技术细节）"
+      placeholder: "例如：身份验证绕过漏洞"
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: "确认"
+      options:
+        - label: "我已经通过邮件私下报告了此问题"
+          required: true
+        - label: "我理解不应在公开渠道讨论安全问题"
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ## 📧 如何私下报告
+
+        发送邮件至：**security@zhongshengzhishu.org**
+
+        邮件内容应包括：
+        
+        1. **问题描述** - 清晰描述漏洞
+        2. **复现步骤** - 如何重现问题
+        3. **影响评估** - 漏洞的影响范围
+        4. **建议修复** - 如果有的话
+        5. **联系方式** - 您的邮箱（用于后续沟通）
+
+        ## ⏱️ 响应时间
+
+        - 🕐 首次响应：24小时内
+        - 🔧 修复时间：7天内（严重漏洞）
+        - 📢 公开披露：修复后30天
+
+        ## 🙏 致谢
+
+        我们会在修复后公开感谢发现漏洞的研究者！

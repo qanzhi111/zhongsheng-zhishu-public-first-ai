@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>开发者文档 - 众生智枢</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    h1 {
+      color: #667eea;
+      border-bottom: 3px solid #667eea;
+      padding-bottom: 10px;
+      margin-bottom: 30px;
+    }
+    h2 {
+      color: #764ba2;
+      margin-top: 40px;
+      margin-bottom: 20px;
+    }
+    h3 {
+      color: #333;
+      margin-top: 30px;
+    }
+    pre {
+      background: #2d3748;
+      color: #e2e8f0;
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 20px 0;
+    }
+    code {
+      background: #edf2f7;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin: 20px 0;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-decoration: none;
+      border-radius: 50px;
+      font-weight: 600;
+      margin: 10px 10px 10px 0;
+      transition: transform 0.3s ease;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+    .feature-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .feature-item {
+      background: #f8fafc;
+      padding: 20px;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+    .feature-item h4 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📚 众生智枢开发者文档</h1>
+
+    <div class="card">
+      <h2>🚀 快速开始</h2>
+      
+      <h3>前置要求</h3>
+      <div class="feature-list">
+        <div class="feature-item">
+          <h4>Node.js</h4>
+          <p>版本 18.0 或更高</p>
+        </div>
+        <div class="feature-item">
+          <h4>Python</h4>
+          <p>版本 3.9 或更高</p>
+        </div>
+        <div class="feature-item">
+          <h4>Docker</h4>
+          <p>最新稳定版</p>
+        </div>
+      </div>
+
+      <h3>克隆项目</h3>
+      <pre><code>git clone https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai.git
+cd zhongsheng-zhishu-public-first-ai</code></pre>
+
+      <h3>本地开发</h3>
+      <pre><code># 方式1：使用Docker（推荐）
+cd website
+docker-compose up -d
+
+# 方式2：手动安装
+# 后端
+cd website/backend
+pip install -r requirements.txt
+python main.py
+
+# 前端
+cd website/frontend
+npm install
+npm start</code></pre>
+
+      <div style="margin-top: 20px;">
+        <a href="https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai" class="btn">📂 GitHub仓库</a>
+        <a href="https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai/issues" class="btn">❓ 遇到问题</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🗂️ 项目结构</h2>
+      <pre><code>zhongsheng-zhishu-public-first-ai/
+├── website/              # 全民民主监督平台
+│   ├── backend/         # Python FastAPI后端
+│   └── frontend/        # React前端应用
+├── peoples-chain/        # 人民链区块链项目
+│   ├── contracts/       # Solidity智能合约
+│   ├── ai-layer/        # AI风控引擎
+│   ├── backend/         # Node.js后端
+│   └── frontend/        # React前端
+├── .github/             # GitHub配置
+│   ├── workflows/       # Actions自动化
+│   ├── ISSUE_TEMPLATE/  # Issue模板
+│   └── FUNDING.yml     # 赞助配置
+└── docs/                # 文档网站</code></pre>
+    </div>
+
+    <div class="card">
+      <h2>🎯 开发任务</h2>
+      
+      <h3>新手任务</h3>
+      <div class="feature-list">
+        <div class="feature-item">
+          <h4>📝 文档完善</h4>
+          <p>改善README和文档质量</p>
+        </div>
+        <div class="feature-item">
+          <h4>🧪 编写测试</h4>
+          <p>为AI引擎添加单元测试</p>
+        </div>
+        <div class="feature-item">
+          <h4>📱 UI优化</h4>
+          <p>优化移动端响应式设计</p>
+        </div>
+        <div class="feature-item">
+          <h4>🔧 示例数据</h4>
+          <p>添加测试和演示数据</p>
+        </div>
+      </div>
+
+      <p style="margin-top: 20px;">
+        <a href="https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai/issues?q=label%3A%22good+first+issue%22" class="btn">🏷️ 查看所有新手任务</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>🤝 贡献指南</h2>
+      
+      <h3>1. Fork项目</h3>
+      <pre><code>点击GitHub页面右上角的"Fork"按钮</code></pre>
+
+      <h3>2. 创建分支</h3>
+      <pre><code>git checkout -b feature/your-feature</code></pre>
+
+      <h3>3. 开发并提交</h3>
+      <pre><code>git add .
+git commit -m "feat: 添加新功能"
+git push origin feature/your-feature</code></pre>
+
+      <h3>4. 创建Pull Request</h3>
+      <pre><code>在GitHub上创建Pull Request，标题格式：
+[feat/fix/docs]: 简短描述
+
+请详细说明：
+- 这个PR做了什么
+- 解决了什么问题
+- 测试了哪些场景</code></pre>
+
+      <p style="margin-top: 20px;">
+        <a href="https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai/blob/main/.github/CODE_OF_CONDUCT.md" class="btn">📜 行为准则</a>
+        <a href="https://github.com/qanzhi111/zhongsheng-zhishu-public-first-ai/discussions" class="btn">💬 讨论区</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>📞 获取帮助</h2>
+      
+      <div class="feature-list">
+        <div class="feature-item">
+          <h4>📧 邮件</h4>
+          <p>contact@zhongshengzhishu.org</p>
+        </div>
+        <div class="feature-item">
+          <h4>💬 微信</h4>
+          <p>zhongshengzhishu</p>
+        </div>
+        <div class="feature-item">
+          <h4>🐛 Issues</h4>
+          <p>报告Bug和建议功能</p>
+        </div>
+        <div class="feature-item">
+          <h4>💬 Discussions</h4>
+          <p>技术讨论和问答</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; color: #666;">
+      <p><strong>智枢为民，众生平等；AI为公，永不异化。</strong></p>
+      <p>感谢您的参与！🙏</p>
+    </div>
+  </div>
+</body>
+</html>

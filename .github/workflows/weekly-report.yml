@@ -1,0 +1,181 @@
+name: "自动发布周报"
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # 每周一早上8点（北京时间）
+  workflow_dispatch:
+
+jobs:
+  weekly-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 生成周报
+        id: report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // 获取上周的数据
+            const since = new Date();
+            since.setDate(since.getDate() - 7);
+            const sinceISO = since.toISOString().split('T')[0];
+            
+            // 获取PR和Issue数据
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'all',
+              sort: 'updated',
+              direction: 'desc'
+            });
+            
+            const { data: issues } = await github.rest.issues.list({
+              owner,
+              repo,
+              since: since.getTime(),
+              state: 'open'
+            });
+            
+            const { data: closedIssues } = await github.rest.issues.list({
+              owner,
+              repo,
+              since: since.getTime(),
+              state: 'closed'
+            });
+            
+            // 计算统计数据
+            const newPRs = prs.filter(pr => 
+              new Date(pr.created_at) >= since
+            ).length;
+            
+            const mergedPRs = prs.filter(pr => 
+              pr.merged_at && new Date(pr.merged_at) >= since
+            ).length;
+            
+            const newIssues = issues.length;
+            const closedIssuesCount = closedIssues.length;
+            
+            // 获取贡献者
+            const { data: contributors } = await github.rest.repos.listContributors({
+              owner,
+              repo,
+              per_page: 10
+            });
+            
+            // 生成周报
+            const weekNumber = Math.ceil(since.getDate() / 7);
+            const reportTitle = `📊 周报 #${weekNumber} - ${since.toLocaleDateString('zh-CN')}`;
+            
+            const reportBody = `
+            # 📊 众生智枢周报 #${weekNumber}
+
+            **报告周期：** ${since.toLocaleDateString('zh-CN')} - ${new Date().toLocaleDateString('zh-CN')}
+
+            ---
+
+            ## 🎯 本周数据
+
+            ### 代码贡献
+            | 指标 | 数量 |
+            |------|------|
+            | 🆕 新增PR | ${newPRs} |
+            | ✅ 合并PR | ${mergedPRs} |
+            | 📝 新增Issue | ${newIssues} |
+            | ✅ 关闭Issue | ${closedIssuesCount} |
+
+            ### 社区活跃
+
+            | 指标 | 状态 |
+            |------|------|
+            | 活跃贡献者 | ${contributors.length}+ |
+            | 社区讨论 | 查看 [Discussions](https://github.com/${owner}/${repo}/discussions) |
+
+            ---
+
+            ## 🏆 本周亮点
+
+            ${mergedPRs > 0 ? `- ✅ ${mergedPRs}个PR已合并，感谢所有贡献者！` : '- 本周暂无合并，但我们期待您的贡献！'}
+            ${closedIssuesCount > 0 ? `- 🎉 ${closedIssuesCount}个问题已解决！` : ''}
+
+            ---
+
+            ## 📌 值得关注
+
+            ### 🔥 活跃讨论
+            查看 [Discussions](https://github.com/${owner}/${repo}/discussions) 参与社区讨论！
+
+            ### 🎯 待办事项
+            - 认领 [good first issue](https://github.com/${owner}/${repo}/issues?q=label%3A%22good+first+issue%22) 标签任务
+            - 参与 [Discussions](https://github.com/${owner}/${repo}/discussions) 提出想法
+            - 查看 [Projects](https://github.com/${owner}/${repo}/projects) 了解项目进度
+
+            ---
+
+            ## 🚀 如何参与
+
+            ### 新手任务
+            访问 [DEVELOPER_RECRUITMENT.md](https://github.com/${owner}/${repo}/blob/main/DEVELOPER_RECRUITMENT.md) 了解如何开始！
+
+            ### 快速开始
+            \`\`\`bash
+            # Fork项目
+            git clone https://github.com/${owner}/${repo}.git
+            cd ${repo}
+            
+            # 创建分支
+            git checkout -b feature/your-feature
+            
+            # 开发
+            # ...
+            
+            # 提交PR
+            git push origin feature/your-feature
+            \`\`\`
+
+            ---
+
+            ## 🙏 致谢
+
+            感谢所有贡献者的努力！
+
+            ---
+
+            *由 GitHub Actions 自动生成*
+            
+            **智枢为民，众生平等；AI为公，永不异化。**
+
+            *众生智枢 · 开发者社区*
+            `;
+            
+            // 创建周报Issue
+            const { data: issue } = await github.rest.issues.create({
+              owner,
+              repo,
+              title: reportTitle,
+              body: reportBody,
+              labels: ['weekly-report']
+            });
+            
+            console.log('周报已创建：', issue.html_url);
+            
+            // 设置输出
+            core.setOutput('report_url', issue.html_url);
+            
+            // 发布到Discussions
+            try {
+              await github.rest.discussions.create({
+                owner,
+                repo,
+                categoryId: 'DIC_kwD...', // 需要替换为实际的category ID
+                title: reportTitle,
+                body: reportBody
+              });
+            } catch (error) {
+              console.log('Discussions创建失败，跳过');
+            }
+
+      - name: 发布到Discussions
+        if: steps.report.outputs.report_url
+        run: |
+          echo "周报已创建：${{ steps.report.outputs.report_url }}"

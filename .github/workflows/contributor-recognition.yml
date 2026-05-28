@@ -1,0 +1,127 @@
+name: "贡献者认可"
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  recognize:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    
+    steps:
+      - name: 生成奖励
+        id: reward
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const prNumber = pr.number;
+            const title = pr.title;
+            
+            let points = 0;
+            let badge = '';
+            let contributionType = '';
+            
+            if (title.includes('feat') || title.includes('feature')) {
+              points = 30;
+              badge = '✨';
+              contributionType = '新功能';
+            } else if (title.includes('fix') || title.includes('bug')) {
+              points = 10;
+              badge = '🐛';
+              contributionType = 'Bug修复';
+            } else if (title.includes('docs') || title.includes('doc')) {
+              points = 5;
+              badge = '📖';
+              contributionType = '文档完善';
+            } else if (title.includes('test')) {
+              points = 15;
+              badge = '🧪';
+              contributionType = '测试编写';
+            } else if (title.includes('refactor')) {
+              points = 20;
+              badge = '♻️';
+              contributionType = '代码重构';
+            } else if (title.includes('security')) {
+              points = 50;
+              badge = '🛡️';
+              contributionType = '安全修复';
+            } else if (title.includes('perf') || title.includes('performance')) {
+              points = 20;
+              badge = '⚡';
+              contributionType = '性能优化';
+            } else {
+              points = 5;
+              badge = '🎨';
+              contributionType = '其他贡献';
+            }
+            
+            const celebrationMessage = `
+            ${badge}🎉 太棒了！@${author} 的PR #${prNumber} 已合并！
+
+            ## 贡献者信息
+
+            - 🏅 贡献积分：+${points}
+            - 🎖️ 贡献类型：${badge} ${contributionType}
+            - 📝 PR标题：${title}
+
+            ## 🎯 积分规则
+
+            | 类型 | 积分 |
+            |------|------|
+            | ✨ 新功能 | 30分 |
+            | 🛡️ 安全修复 | 50分 |
+            | ⚡ 性能优化 | 20分 |
+            | ♻️ 代码重构 | 20分 |
+            | 🧪 测试编写 | 15分 |
+            | 🐛 Bug修复 | 10分 |
+            | 📖 文档完善 | 5分 |
+            | 🎨 其他 | 5分 |
+
+            ## 🏆 贡献者等级
+
+            - 🥉 青铜：100分
+            - 🥈 白银：500分
+            - 🥇 黄金：2000分
+            - 💎 钻石：5000分
+            - 👑 传奇：10000分
+
+            ## 📈 查看排名
+
+            请访问 [CONTRIBUTORS.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/CONTRIBUTORS.md) 查看完整贡献者排名！
+
+            ---
+
+            **您的每一行代码，都在推动人类文明进步！** 🚀
+
+            **智枢为民，众生平等；AI为公，永不异化。**
+            `;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: celebrationMessage
+            });
+
+            console.log(`Awarded ${points} points to ${author} for ${contributionType}`);
+
+      - name: 更新贡献者标签
+        if: steps.reward.outputs.points
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['merged', 'contributor-recognized']
+              });
+            } catch (error) {
+              console.log('标签添加失败');
+            }

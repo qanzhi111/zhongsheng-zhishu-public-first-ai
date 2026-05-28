@@ -1,0 +1,105 @@
+name: "僵尸Issue自动处理"
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # 每周日凌晨检查
+  workflow_dispatch:
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检查并标记僵尸Issue
+        uses: actions/stale@v9
+        with:
+          # Issue标记为stale的天数
+          days-before-stale: 60
+          # stale后多少天关闭
+          days-before-close: 7
+          # 要检查的类型
+          operations-per-run: 100
+          # Issue标签
+          exempt-issue-labels: 'pinned,security,high-priority'
+          # stale消息
+          stale-issue-message: |
+            👋 您好！
+
+            这个Issue已经闲置了 **60天**。
+
+            我们理解您可能正在等待更多信息，或者问题已经自行解决。
+
+            ## 请协助我们
+
+            如果这个Issue仍然需要关注，请：
+            - ✅ 回复说明当前状态
+            - ✅ 提供最新进展
+            - ✅ 补充相关信息
+
+            如果您不再需要此Issue，请：
+            - ❌ 无需任何操作（我们会关闭）
+
+            感谢您的理解和支持！
+
+            ---
+
+            **智枢为民，众生平等。** 🙏
+            
+          close-issue-message: |
+            🔒 此Issue因 **60天无响应** 已自动关闭。
+
+            如果您仍然需要解决这个问题，请：
+            1. 在此页面重新打开Issue
+            2. 提供最新的状态和信息
+            3. 我们会重新评估
+
+            感谢您的参与！
+
+            ---
+
+            **保持项目整洁是我们的共同责任。** 💪
+            
+          # PR标记为stale的天数
+          days-before-stale-pr: 30
+          # PR stale后关闭的天数
+          days-before-close-pr: 7
+          # PR标签
+          exempt-pr-labels: 'pinned,work-in-progress'
+          # PR stale消息
+          stale-pr-message: |
+            👋 您好！
+
+            这个PR已经闲置了 **30天**。
+
+            ## 请协助我们
+
+            如果这个PR还在开发中，请：
+            - ✅ 更新进度
+            - ✅ 提交最新代码
+            - ✅ 说明预计完成时间
+
+            如果PR已完成，请：
+            - ✅ 确认所有检查通过
+            - ✅ 请求审查
+
+            如果不再需要此PR，请：
+            - ❌ 无需任何操作（我们会关闭）
+
+            感谢您的贡献！
+
+            ---
+
+            **智枢为民，众生平等。** 🙏
+            
+          close-pr-message: |
+            🔒 此PR因 **30天无响应** 已自动关闭。
+
+            如果您仍想合并这个PR，请：
+            1. 在此页面重新打开
+            2. 更新最新代码
+            3. 请求审查
+
+            感谢您的贡献！
+
+            ---
+
+            **让我们保持项目活跃！** 💪

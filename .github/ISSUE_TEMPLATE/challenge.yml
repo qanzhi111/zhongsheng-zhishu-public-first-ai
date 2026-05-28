@@ -1,0 +1,132 @@
+name: "🏆 挑战任务认领"
+description: "认领GitHub Projects中的挑战任务"
+title: "[Challenge] "
+labels: ["challenge"]
+assignees: []
+projects: ["Developer Recruitment"]
+milestone: ""
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🏆 挑战任务认领
+
+        欢迎认领挑战任务！请填写以下信息。
+
+        ---
+        
+  - type: dropdown
+    id: challenge-type
+    attributes:
+      label: "挑战类型"
+      options:
+        - 新手任务（适合第一次贡献）
+        - 进阶任务（需要一定经验）
+        - 专家任务（需要深度技术专长）
+        - 研究课题（学术研究方向）
+    validations:
+      required: true
+
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: "预估难度"
+      options:
+        - ⭐ 简单（1-2小时）
+        - ⭐⭐ 中等（半天）
+        - ⭐⭐⭐ 较难（1-2天）
+        - ⭐⭐⭐⭐ 困难（1周）
+        - ⭐⭐⭐⭐⭐ 非常困难（2周以上）
+    validations:
+      required: true
+
+  - type: input
+    id: github-username
+    attributes:
+      label: "GitHub用户名"
+      description: "您的GitHub用户名"
+      placeholder: "例如：zhangsan"
+    validations:
+      required: true
+
+  - type: textarea
+    id: relevant-skills
+    attributes:
+      label: "💪 相关技能"
+      description: "您拥有的相关技能和经验"
+      placeholder: |
+        - 熟悉React/TypeScript开发
+        - 有智能合约开发经验
+        - 了解机器学习基础
+        
+    validations:
+      required: true
+
+  - type: textarea
+    id: time-commitment
+    attributes:
+      label: "⏰ 投入时间"
+      description: "您每周可以投入多少时间？"
+      placeholder: "例如：每周5-10小时"
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "🎯 参与动机"
+      description: "为什么想参与这个项目？"
+      placeholder: |
+        我参与的原因：
+        1. 对"为民AI"理念的认同
+        2. 希望学习区块链开发
+        3. 希望为开源社区做贡献
+        
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-approach
+    attributes:
+      label: "💡 初步方案"
+      description: "您对如何完成任务的初步想法（可选）"
+      placeholder: |
+        我的初步思路：
+        1. 首先研究现有实现
+        2. 设计接口方案
+        3. 开始编码实现
+        
+  - type: checkboxes
+    id: commitment
+    attributes:
+      label: "承诺"
+      options:
+        - label: "我会在2周内提交初次PR"
+          required: true
+        - label: "我会及时更新任务进度"
+          required: true
+        - label: "我理解GPLv3开源协议"
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ## 🎁 完成任务后
+
+        您将获得：
+        
+        - 🏅 贡献积分（根据任务难度 10-100分）
+        - 📜 核心贡献者证书
+        - 🎁 特别纪念品
+        - 👥 加入贡献者社区
+
+        ## 📚 学习资源
+
+        - [开发者招募指南](../DEVELOPER_RECRUITMENT.md)
+        - [贡献指南](../CONTRIBUTING.md)
+        - [技术文档](../docs/)
+
+        期待您的参与！🙏

@@ -1,0 +1,122 @@
+name: "❓ 寻求帮助"
+description: "在学习或使用项目时需要帮助"
+title: "[Help] "
+labels: ["question"]
+assignees: []
+projects: []
+milestone: ""
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ❓ 寻求帮助
+
+        欢迎提问！我们社区很乐意帮助您。
+
+        ---
+        
+  - type: textarea
+    id: question
+    attributes:
+      label: "您的问题"
+      description: "详细描述您遇到的问题"
+      placeholder: "请详细描述您的问题、错误或困惑"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "📋 相关上下文"
+      description: "您正在尝试做什么？使用什么功能？"
+      placeholder: |
+        我正在尝试：
+        1. 搭建开发环境
+        2. 运行示例代码
+        3. 部署到服务器
+        
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-you-tried
+    attributes:
+      label: "🔍 您已经尝试的方法"
+      description: "您已经尝试了哪些解决方法？结果如何？"
+      placeholder: |
+        我已经尝试：
+        1. 重启服务器 - 无效
+        2. 重新安装依赖 - 错误依旧
+        3. 查看文档 - 没找到相关信息
+        
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-message
+    attributes:
+      label: "📄 错误信息"
+      description: "如果有错误信息，请完整粘贴"
+      placeholder: |
+        错误信息：
+        ```
+        Error: Cannot find module 'xxx'
+            at Object.<anonymous> (/path/to/file.js:10:15)
+        ```
+        
+
+  - type: input
+    id: environment
+    attributes:
+      label: "🖥️ 环境信息"
+      description: "操作系统、版本等信息"
+      placeholder: "例如：macOS 14.0, Node.js 18.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: relevant-code
+    attributes:
+      label: "💻 相关代码"
+      description: "粘贴相关的代码片段（可选）"
+      placeholder: |
+        ```javascript
+        // 您的代码
+        const result = await api.call();
+        ```
+
+  - type: textarea
+    id: documentation-links
+    attributes:
+      label: "📖 相关文档"
+      description: "您参考过的文档链接（可选）"
+      placeholder: |
+        - 文档链接：...
+        - 教程链接：...
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "确认清单"
+      options:
+        - label: "我已经在搜索引擎中搜索过"
+          required: true
+        - label: "我已经阅读过相关文档"
+          required: true
+        - label: "我提供了完整的错误信息和上下文"
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ## 💡 提示
+
+        - 越详细的问题描述，越容易获得帮助
+        - 请提供完整的错误信息
+        - 附上相关代码片段会更有助于诊断
+        - 查看 [FAQ文档](docs/faq.md) 可能已经有答案
+
+        感谢您的提问！我们会尽快回复 🙏

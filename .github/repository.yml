@@ -1,0 +1,79 @@
+# GitHub配置文件
+# 启用各种GitHub功能
+
+repository:
+  # 启用Discussions
+  has_discussions: true
+  
+  # 启用Wiki
+  has_wiki: true
+  
+  # 启用Issues
+  has_issues: true
+  
+  # 允许Fork
+  allow_forking: true
+  
+  # 公开仓库
+  visibility: public
+
+# 默认分支
+default_branch: main
+
+# 话题标签（用于GitHub Explore发现）
+topics:
+  - blockchain
+  - artificial-intelligence
+  - public-good
+  - decentralized-identity
+  - fintech
+  - governance
+  - open-source
+  - typescript
+  - python
+  - nodejs
+  - react
+  - smart-contracts
+  - dao
+  - community-driven
+  - ethical-ai
+
+# 自动化配置
+automation:
+  # Issue标签自动配置
+  auto_init_issue_labels:
+    - bug
+    - enhancement
+    - documentation
+    - question
+    - good first issue
+    - help wanted
+    - security
+    - challenge
+
+# 安全配置
+security:
+  # 启用依赖图
+  dependency_graph_enabled: true
+  
+  # 启用秘密扫描
+  secret_scanning_enabled: true
+  
+  # 启用推送保护
+  secret_scanning_push_protection_enabled: true
+
+# 贡献者配置
+contributors:
+  # 允许贡献者协议
+  license_template: gpl-3.0
+  
+  # 要求分支保护
+  require_branch_protection: true
+
+# 功能预览
+features:
+  # 启用项目（Projects）
+  projects_enabled: true
+  
+  # 启用讨论（Discussions）
+  discussions_enabled: true
