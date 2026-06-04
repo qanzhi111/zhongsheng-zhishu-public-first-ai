@@ -1,0 +1,122 @@
+name: "自动过期PR处理"
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 每天早上6点（北京时间）
+  workflow_dispatch:
+
+jobs:
+  close-expired-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检查过期PR
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            let closedCount = 0;
+            let pendingCount = 0;
+
+            for (const pr of prs) {
+              // 检查PR是否已过时（长时间未更新）
+              const updatedAt = new Date(pr.updated_at);
+              const lastCommitAt = new Date(pr.head.label || Date.now());
+
+              // 检查是否有审查意见未处理
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: pr.number
+              });
+
+              const hasUnresolvedReviews = comments.some(
+                c => c.user.login !== pr.user.login &&
+                     c.body.includes('需要') ||
+                     c.body.includes('please') ||
+                     c.body.includes('fix')
+              );
+
+              // 检查是否超过30天没有新提交
+              if (updatedAt < thirtyDaysAgo && !pr.draft) {
+                // 检查是否有阻塞性标签
+                const labels = pr.labels.map(l => l.name);
+                const isBlocked = labels.includes('blocked') || labels.includes('needs-author-response');
+
+                if (!isBlocked) {
+                  // 发送即将关闭提醒
+                  const daysSinceUpdate = Math.floor((Date.now() - updatedAt) / (1000 * 60 * 60 * 24));
+
+                  if (daysSinceUpdate >= 25 && daysSinceUpdate < 30) {
+                    // 7天内即将关闭，发送提醒
+                    await github.rest.issues.createComment({
+                      owner,
+                      repo,
+                      issue_number: pr.number,
+                      body: `⏰ 您好！此PR已超过25天未更新。
+
+如需保持PR活跃，请：
+- ✅ 在5天内提交新提交或评论
+- ✅ 回复所有审查意见
+- ✅ 确保所有检查通过
+
+否则将在5天后自动关闭。
+
+---
+**智枢为民，众生平等。** 🙏`
+                    });
+                    pendingCount++;
+                  } else if (daysSinceUpdate >= 30) {
+                    // 已超过30天，发送关闭通知
+                    await github.rest.issues.createComment({
+                      owner,
+                      repo,
+                      issue_number: pr.number,
+                      body: `🔒 此PR因 **${daysSinceUpdate}天无更新** 已自动关闭。
+
+如果您仍想完成此PR：
+1. 重新打开此PR
+2. 更新最新代码
+3. 回复此评论
+
+感谢您的贡献！
+
+---
+**保持项目活跃是我们的共同责任。** 💪`
+                    });
+
+                    await github.rest.pulls.update({
+                      owner,
+                      repo,
+                      pull_number: pr.number,
+                      state: 'closed'
+                    });
+
+                    // 添加关闭标签
+                    await github.rest.issues.addLabels({
+                      owner,
+                      repo,
+                      issue_number: pr.number,
+                      labels: ['auto-closed']
+                    });
+
+                    closedCount++;
+                  }
+                }
+              }
+            }
+
+            console.log(`已发送提醒: ${pendingCount} 个PR`);
+            console.log(`已关闭: ${closedCount} 个PR`);
+            core.setOutput('reminded', pendingCount);
+            core.setOutput('closed', closedCount);

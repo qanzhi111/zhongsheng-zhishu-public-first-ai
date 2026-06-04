@@ -1,0 +1,115 @@
+name: "自动分配审查者"
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, review_requested]
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  assign-reviewers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 自动分配审查者
+        id: assign
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = pr.number;
+
+            // 维护者列表
+            const maintainers = ['your-github-username']; // TODO: 替换为实际维护者
+
+            // 组件所有者映射
+            const componentOwners = {
+              'peoples-chain/frontend': ['your-frontend-reviewer'], // TODO: 替换
+              'peoples-chain/backend': ['your-backend-reviewer'], // TODO: 替换
+              'peoples-chain/contracts': ['your-contract-reviewer'], // TODO: 替换
+              'website/frontend': ['your-website-frontend-reviewer'], // TODO: 替换
+              'website/backend': ['your-website-backend-reviewer'], // TODO: 替换
+            };
+
+            // 根据PR修改的文件确定审查者
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner,
+              repo,
+              pull_number: prNumber
+            });
+
+            const reviewersNeeded = new Set();
+
+            for (const file of files) {
+              const filename = file.filename;
+
+              // 确定文件属于哪个组件
+              for (const [component, owners] of Object.entries(componentOwners)) {
+                if (filename.startsWith(component)) {
+                  owners.forEach(o => reviewersNeeded.add(o));
+                }
+              }
+            }
+
+            // 如果没有匹配到特定审查者，分配默认维护者
+            if (reviewersNeeded.size === 0) {
+              maintainers.forEach(m => reviewersNeeded.add(m));
+            }
+
+            // 排除PR作者
+            reviewersNeeded.delete(pr.user.login);
+
+            const reviewers = Array.from(reviewersNeeded);
+
+            if (reviewers.length > 0) {
+              await github.rest.pulls.requestReviewers({
+                owner,
+                repo,
+                pull_number: prNumber,
+                reviewers
+              });
+              console.log(`已分配审查者: ${reviewers.join(', ')}`);
+            }
+
+            // 添加自动回复
+            const title = pr.title.toLowerCase();
+            let autoReply = '';
+
+            if (title.includes('feat') || title.includes('add')) {
+              autoReply = `🎉 感谢您提交新功能PR！
+
+我们的审查者将在1-2个工作日内进行审查。
+
+**功能PR审查重点：**
+- ✅ 功能完整性
+- ✅ 代码质量
+- ✅ 测试覆盖
+- ✅ 文档更新
+`;
+            } else if (title.includes('fix') || title.includes('bug')) {
+              autoReply = `🐛 感谢您修复Bug！
+
+我们的审查者将优先处理此PR。
+
+**Bug修复审查重点：**
+- ✅ 问题复现
+- ✅ 修复验证
+- ✅ 是否引入新问题
+`;
+            } else if (title.includes('docs')) {
+              autoReply = `📖 感谢您完善文档！
+`;
+            }
+
+            if (autoReply) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: autoReply
+              });
+            }

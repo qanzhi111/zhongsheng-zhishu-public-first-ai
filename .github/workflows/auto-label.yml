@@ -1,0 +1,132 @@
+name: "自动标签"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issues:
+    types: [opened, edited]
+  push:
+    branches: [main, develop]
+
+jobs:
+  label-pr:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: 自动标签PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title.toLowerCase();
+            const files = pr.changed_files || 0;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = pr.number;
+
+            const labels = [];
+
+            // 根据PR类型打标签
+            if (title.includes('fix') || title.includes('bug')) {
+              labels.push('bug');
+            } else if (title.includes('feat') || title.includes('add') || title.includes('new')) {
+              labels.push('enhancement');
+            } else if (title.includes('docs') || title.includes('doc') || title.includes('readme')) {
+              labels.push('documentation');
+            } else if (title.includes('test')) {
+              labels.push('testing');
+            } else if (title.includes('refactor')) {
+              labels.push('refactoring');
+            } else if (title.includes('perf') || title.includes('performance') || title.includes('optimize')) {
+              labels.push('performance');
+            } else if (title.includes('security') || title.includes('vuln')) {
+              labels.push('security');
+            } else if (title.includes('deps') || title.includes('dependency') || title.includes('update')) {
+              labels.push('dependencies');
+            } else if (title.includes('ci') || title.includes('workflow') || title.includes('action')) {
+              labels.push('ci');
+            }
+
+            // 根据文件数量和类型打标签
+            if (files > 100) {
+              labels.push('large-pr');
+            } else if (files > 20) {
+              labels.push('medium-pr');
+            }
+
+            // 根据分支打标签
+            if (pr.base.ref === 'main') {
+              labels.push('production');
+            } else if (pr.base.ref === 'develop') {
+              labels.push('development');
+            }
+
+            // 添加等待审查标签
+            if (!pr.draft) {
+              labels.push('awaiting-review');
+            }
+
+            // 应用标签
+            if (labels.length > 0) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  labels
+                });
+                console.log(`Applied labels: ${labels.join(', ')}`);
+              } catch (error) {
+                console.log('Some labels may already exist');
+              }
+            }
+
+  label-issue:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues'
+    steps:
+      - name: 自动标签Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const title = issue.title.toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = issue.number;
+
+            const labels = [];
+
+            // 根据内容自动分类
+            if (title.includes('bug') || body.includes('bug') || body.includes('error')) {
+              labels.push('bug');
+            }
+            if (title.includes('feat') || title.includes('feature') || title.includes('request')) {
+              labels.push('enhancement');
+            }
+            if (title.includes('question') || title.includes('？') || body.includes('how to')) {
+              labels.push('question');
+            }
+            if (title.includes('security') || body.includes('vulnerability')) {
+              labels.push('security');
+            }
+            if (title.includes('docs') || title.includes('documentation')) {
+              labels.push('documentation');
+            }
+
+            // 添加自动标签
+            labels.push('needs-triage');
+
+            if (labels.length > 0) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  labels
+                });
+              } catch (error) {
+                console.log('Label already exists');
+              }
+            }

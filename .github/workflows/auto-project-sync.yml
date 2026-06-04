@@ -1,0 +1,127 @@
+name: "自动项目同步"
+
+on:
+  issues:
+    types: [opened, closed, deleted]
+  pull_request:
+    types: [opened, closed, merged, ready_for_review, review_request_removed]
+  project_card:
+    types: [created, moved, deleted]
+  schedule:
+    - cron: '0 9 * * *'  # 每天早上9点
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync-project-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 同步Issue状态
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = issue.number;
+
+            // Issue打开时添加到项目
+            if (issue.state === 'open') {
+              const labels = issue.labels.map(l => l.name);
+
+              // 根据标签添加项目状态
+              if (labels.includes('bug')) {
+                console.log(`Issue #${issueNumber} 是Bug，已记录`);
+              } else if (labels.includes('enhancement')) {
+                console.log(`Issue #${issueNumber} 是功能请求`);
+              }
+
+              // 检查是否需要添加到Projects
+              const { data: projects } = await github.rest.projects.listForRepo({
+                owner,
+                repo
+              });
+
+              console.log(`找到 ${projects.length} 个项目`);
+            }
+
+      - name: 同步PR状态
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = pr.number;
+
+            if (pr.merged) {
+              // PR合并时更新状态
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: ['merged']
+              });
+              console.log(`PR #${prNumber} 已合并`);
+            } else if (pr.state === 'open') {
+              // 新PR添加标签
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: ['open']
+              });
+            }
+
+  auto-archive:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: 自动归档旧Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+            const { data: issues } = await github.rest.issues.list({
+              owner,
+              repo,
+              state: 'open',
+              since: sixMonthsAgo.getTime(),
+              per_page: 100
+            });
+
+            let archivedCount = 0;
+
+            for (const issue of issues) {
+              const updatedAt = new Date(issue.updated_at);
+
+              if (updatedAt < sixMonthsAgo) {
+                // 检查是否有重要标签
+                const labels = issue.labels.map(l => l.name);
+                const isImportant = labels.some(l =>
+                  ['pinned', 'security', 'high-priority', 'bug'].includes(l)
+                );
+
+                if (!isImportant) {
+                  // 添加待归档标签
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: issue.number,
+                    labels: ['auto-archive']
+                  });
+                  archivedCount++;
+                }
+              }
+            }
+
+            console.log(`已标记待归档: ${archivedCount} 个Issue`);
+            core.setOutput('archived', archivedCount);
