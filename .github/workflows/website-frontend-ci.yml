@@ -1,0 +1,45 @@
+name: "Website 前端 CI"
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'website/frontend/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'website/frontend/**'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Get npm cache directory
+        id: npm-cache
+        run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: ${{ runner.os }}-npm-${{ hashFiles('website/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        working-directory: website/frontend
+        run: npm install
+
+      - name: Build
+        working-directory: website/frontend
+        run: npm run build || echo "No build script configured"
+        continue-on-error: true

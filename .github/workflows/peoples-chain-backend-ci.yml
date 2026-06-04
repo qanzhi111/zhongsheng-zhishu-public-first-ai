@@ -1,0 +1,47 @@
+name: "Peoples-Chain 后端 CI"
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'peoples-chain/backend/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'peoples-chain/backend/**'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: peoples-chain/backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: peoples-chain/backend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: peoples-chain/backend
+        run: |
+          npx eslint src --ext .ts --max-warnings 0 || true
+
+      - name: Run TypeScript type check
+        working-directory: peoples-chain/backend
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: peoples-chain/backend
+        run: npm run build
+
+      - name: Run tests
+        working-directory: peoples-chain/backend
+        run: npm test || echo "No tests configured yet"

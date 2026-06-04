@@ -22,17 +22,30 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - zhongsheng-network
+
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:8000
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    command: npm start
+    command: npm run dev
     depends_on:
       - backend
     networks:
       - zhongsheng-network
+    profiles:
+      - dev
 
 networks:
   zhongsheng-network:

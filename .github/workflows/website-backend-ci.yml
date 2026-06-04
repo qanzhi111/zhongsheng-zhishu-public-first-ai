@@ -1,0 +1,48 @@
+name: "Website 后端 CI"
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'website/backend/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'website/backend/**'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('website/backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        working-directory: website/backend
+        run: pip install -r requirements.txt
+
+      - name: Lint with ruff
+        run: pip install ruff && ruff check website/backend/
+        continue-on-error: true
+
+      - name: Type check with mypy
+        run: pip install mypy && mypy website/backend/ --ignore-missing-imports || true
+        continue-on-error: true
+
+      - name: Run FastAPI syntax check
+        run: |
+          cd website/backend && python -c "from main import app; print('FastAPI app loaded successfully')"

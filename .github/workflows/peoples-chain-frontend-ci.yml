@@ -1,0 +1,51 @@
+name: "Peoples-Chain 前端 CI"
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'peoples-chain/frontend/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'peoples-chain/frontend/**'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: peoples-chain/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: peoples-chain/frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: peoples-chain/frontend
+        run: npm run lint
+
+      - name: Run TypeScript type check
+        working-directory: peoples-chain/frontend
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: peoples-chain/frontend
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: peoples-chain/frontend/dist
+          retention-days: 7
