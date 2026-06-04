@@ -1,0 +1,85 @@
+# Hermes Agent 配置文件
+# 配置路径: ~/.hermes/config.yaml 或项目根目录 hermes.yaml
+
+version: "1.0.0"
+
+# Agent身份
+agent:
+  name: "众生智枢AI"
+  soul_path: "./SOUL.md"  # 指向SOUL.md
+  memory_path: "./memory"
+  skills_path: "./skills"
+
+# 模型配置
+model:
+  provider: "openai"  # 或 anthropic, nous, openrouter
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 2000
+
+# 记忆配置
+memory:
+  type: "sqlite"  # sqlite, postgres, memory
+  path: "./memory/hermes.db"
+  session_limit: 2200  # 字符限制
+  user_limit: 1375     # 字符限制
+  vector_store: "chroma"  # 向量存储
+
+# 工具配置
+tools:
+  enabled:
+    - github
+    - terminal
+    - browser
+    - file_system
+    - cron
+  github:
+    token_env: "GITHUB_TOKEN"
+    default_owner: "qanzhi111"
+    default_repo: "zhongsheng-zhishu-public-first-ai"
+
+# 安全配置
+safety:
+  pre_approval_required:
+    - delete_branch
+    - force_push
+    - modify_protected_files
+  blocked_patterns:
+    - "password.*=.*['\"]"
+    - "api_key.*=.*['\"]"
+    - "secret.*=.*['\"]"
+  max_destructive_ops_per_day: 5
+
+# 学习配置
+learning:
+  enabled: true
+  auto_generate_skills: true
+  skill_success_threshold: 0.7
+  feedback_collection: true
+
+# 定时任务
+cron:
+  timezone: "Asia/Shanghai"
+  jobs:
+    - name: "daily-learning"
+      schedule: "0 2 * * *"
+      command: "learn-from-history"
+    - name: "pattern-analysis"
+      schedule: "0 3 * * *"
+      command: "pattern-recognition"
+    - name: "stale-check"
+      schedule: "0 6 * * *"
+      command: "auto-close-pr"
+
+# 响应配置
+response:
+  language: "zh-CN"
+  include_timestamp: true
+  include_context: true
+  max_history_length: 10
+
+# 调试配置
+debug:
+  verbose: false
+  log_path: "./logs/hermes.log"
+  save_sessions: true

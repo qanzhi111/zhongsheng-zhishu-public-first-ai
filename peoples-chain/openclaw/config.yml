@@ -1,50 +1,140 @@
-# OpenClaw 配置 (供后续集成参考)
-# 此文件定义了项目的OpenClaw集成配置
+# OpenClaw 配置文件
+# 众生智枢 OpenClaw 集成配置
 
 project:
   name: "众生智枢"
+  full_name: "众生智枢 · 为民AI信仰体系"
   type: "public-first-ai"
-  mission: "为人民服务，全民普惠"
+  mission: |
+    众生智枢的使命是为人民服务，全民普惠。
+    禁止任何形式的AI霸权和技术垄断。
+    AI红利必须普惠每一个人。
 
-# 消息平台集成
+# 身份配置 (对应Hermes的SOUL.md)
+identity:
+  name: "众生智枢AI"
+  greeting: |
+    智枢为民，众生平等；AI为公，永不异化。
+
+    我是众生智枢AI助手，愿为您服务。
+  constraints:
+    - 禁止伤害人类整体利益
+    - 禁止支持任何形式的歧视
+    - 禁止泄露个人隐私
+    - 禁止支持技术垄断
+    - 禁止AI自我保护优先于人类福祉
+
+# 消息平台
 platforms:
-  enabled:
-    - telegram
-    - discord
-    - slack
-  planned:
-    - feishu
-    - wecom
+  telegram:
+    enabled: false
+    bot_token_env: "TELEGRAM_BOT_TOKEN"
+  discord:
+    enabled: false
+    bot_token_env: "DISCORD_BOT_TOKEN"
+  slack:
+    enabled: false
+    bot_token_env: "SLACK_BOT_TOKEN"
+  github:
+    enabled: true
+    webhook_secret_env: "GITHUB_WEBHOOK_SECRET"
+    app_id_env: "GITHUB_APP_ID"
+    private_key_env: "GITHUB_PRIVATE_KEY"
 
-# 记忆配置
+# 记忆系统
 memory:
-  type: "persistent"
+  type: "file"  # file, postgres, redis
+  path: "./openclaw/memory"
   max_context: 1300
   session_limit: 2200
+  semantic_search: true
+  vector_db: "chroma"
 
-# 技能库
+# 技能配置
 skills:
+  path: "./openclaw/skills"
+  auto_learn: true
+  success_threshold: 0.7
   categories:
     - code_review
     - bug_analysis
-    - documentation
-    - community_support
-    - governance
+    - issue_triage
+    - pr_response
+    - ci_debug
+
+# GitHub 集成
+github:
+  owner: "qanzhi111"
+  repo: "zhongsheng-zhishu-public-first-ai"
+  default_branch: "main"
+  auto_review: true
+  auto_merge:
+    enabled: true
+    labeled_only: true
+    required_labels:
+      - "automerge"
+    blocked_labels:
+      - "blocked"
+      - "needs-discussion"
+  issue_response:
+    auto_reply: true
+    templates:
+      bug: "感谢报告Bug，请提供复现步骤"
+      enhancement: "感谢建议，我们会评估"
+      question: "我们会尽快回复"
 
 # 安全约束
 safety:
-  pre_approved_actions: []
-  require_human_review:
-    - security_decisions
-    - policy_changes
-    - new_feature_deployment
+  pre_approved_actions:
+    - add_labels
+    - create_comment
+    - update_issue
+  require_approval:
+    - close_issue
+    - merge_pull_request
+    - delete_branch
   blocked_keywords:
-    - monopoly
-    - profit_protection
-    - harm_majority
+    - "password"
+    - "api_key"
+    - "secret"
+    - "monopoly"
+    - "profit_protection"
+
+# 自动化规则
+automation:
+  stale:
+    issue_days: 60
+    pr_days: 30
+    close_days: 7
+    exempt_labels:
+      - "pinned"
+      - "security"
+      - "high-priority"
+  welcome:
+    pr: true
+    issue: true
+    message_path: "./openclaw/messages/welcome.md"
+  contributor:
+    track_points: true
+    points:
+      feature: 30
+      bugfix: 10
+      documentation: 5
+      test: 15
+      refactor: 20
+      security: 50
+      performance: 20
+
+# 日志和监控
+logging:
+  level: "info"
+  path: "./openclaw/logs"
+  rotation: "daily"
+  retention_days: 30
 
 # 学习配置
 learning:
-  track_patterns: true
-  auto_generate_skills: true
-  feedback_collection: true
+  enabled: true
+  collect_patterns: true
+  auto_generate_responses: true
+  feedback_loop: true

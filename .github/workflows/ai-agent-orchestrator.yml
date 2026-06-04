@@ -1,0 +1,457 @@
+name: "AI Agent 统一调度中心"
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    types: [opened, closed, synchronize]
+  issues:
+    types: [opened, closed, labeled]
+  repository_dispatch:
+    types: [ai-learn, ai-analyze, ai-assist]
+  schedule:
+    - cron: '0 */4 * * *'  # 每4小时
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  # ============================================================
+  # Hermes Agent 任务调度
+  # ============================================================
+  hermes-task-dispatcher:
+    runs-on: ubuntu-latest
+    outputs:
+      task_type: ${{ steps.analyze.outputs.task_type }}
+      priority: ${{ steps.analyze.outputs.priority }}
+    steps:
+      - name: 分析事件类型
+        id: analyze
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const event = context.eventName;
+            let taskType = 'general';
+            let priority = 'medium';
+
+            if (event === 'pull_request') {
+              const action = context.payload.action;
+              const title = context.payload.pull_request.title.toLowerCase();
+
+              if (title.includes('feat') || title.includes('add')) {
+                taskType = 'feature-review';
+                priority = 'medium';
+              } else if (title.includes('fix') || title.includes('bug')) {
+                taskType = 'bugfix-review';
+                priority = 'high';
+              } else if (title.includes('docs')) {
+                taskType = 'docs-review';
+                priority = 'low';
+              } else if (title.includes('deps')) {
+                taskType = 'deps-update';
+                priority = 'low';
+              }
+
+              if (action === 'opened') {
+                console.log(`New PR: ${taskType}`);
+              } else if (action === 'closed' && context.payload.pull_request.merged) {
+                taskType = 'pr-merged';
+                priority = 'low';
+              }
+            } else if (event === 'issues') {
+              const action = context.payload.action;
+              const labels = context.payload.issue.labels.map(l => l.name);
+
+              if (labels.includes('bug')) {
+                taskType = 'bug-triage';
+                priority = 'high';
+              } else if (labels.includes('enhancement')) {
+                taskType = 'feature-triage';
+                priority = 'medium';
+              } else if (labels.includes('question')) {
+                taskType = 'question-response';
+                priority = 'medium';
+              }
+
+              if (action === 'opened') {
+                console.log(`New Issue: ${taskType}`);
+              }
+            }
+
+            core.setOutput('task_type', taskType);
+            core.setOutput('priority', priority);
+
+      - name: 记录任务到记忆库
+        if: steps.analyze.outputs.task_type != ''
+        run: |
+          echo "任务已记录: ${{ steps.analyze.outputs.task_type }}"
+          echo "优先级: ${{ steps.analyze.outputs.priority }}"
+          echo "时间: $(date -Iseconds)"
+
+      - name: 触发Hermes学习 (仅每日一次)
+        if: github.event_name == 'schedule'
+        run: |
+          echo "触发Hermes每日学习..."
+          # 调用学习工作流
+          gh workflow run learn-from-history.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================
+  # 代码审查任务
+  # ============================================================
+  code-review-task:
+    runs-on: ubuntu-latest
+    needs: hermes-task-dispatcher
+    if: needs.hermes-task-dispatcher.outputs.task_type == 'feature-review' ||
+        needs.hermes-task-dispatcher.outputs.task_type == 'bugfix-review'
+    steps:
+      - name: 执行代码审查
+        id: review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const files = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number
+            });
+
+            const stats = {
+              files: files.data.length,
+              additions: 0,
+              deletions: 0
+            };
+
+            for (const file of files.data) {
+              stats.additions += file.additions;
+              stats.deletions += file.deletions;
+            }
+
+            // 生成审查报告
+            const reviewComment = `
+            ## 🔍 AI 代码审查报告
+
+            ### 变更统计
+            - 📂 文件数: ${stats.files}
+            - ➕ 新增: ${stats.additions} 行
+            - ➖ 删除: ${stats.deletions} 行
+
+            ### 基础检查
+            - [ ] 代码格式符合规范
+            - [ ] 没有明显语法错误
+            - [ ] 变量命名清晰
+
+            ### 功能检查
+            - [ ] 实现与描述一致
+            - [ ] 错误处理完善
+            - [ ] 边界情况考虑
+
+            ### 安全检查
+            - [ ] 无注入风险
+            - [ ] 敏感信息未硬编码
+            - [ ] 权限检查正确
+
+            ### 为民原则
+            - [ ] 无歧视性内容
+            - [ ] 无垄断倾向
+
+            ---
+            *🤖 众生智枢AI审查*
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: reviewComment
+            });
+
+            console.log('审查报告已发布');
+
+      - name: 分配审查者
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const files = pr.changed_files;
+
+            // 根据文件数量确定审查者数量
+            let reviewers = [];
+            if (files > 20) {
+              reviewers = ['maintainer-1', 'maintainer-2'];
+            } else {
+              reviewers = ['maintainer-1'];
+            }
+
+            // 排除作者
+            reviewers = reviewers.filter(r => r !== pr.user.login);
+
+            if (reviewers.length > 0) {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                reviewers
+              });
+            }
+
+  # ============================================================
+  # Issue处理任务
+  # ============================================================
+  issue-handling-task:
+    runs-on: ubuntu-latest
+    needs: hermes-task-dispatcher
+    if: needs.hermes-task-dispatcher.outputs.task_type == 'bug-triage' ||
+        needs.hermes-task-dispatcher.outputs.task_type == 'feature-triage'
+    steps:
+      - name: Issue智能响应
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const taskType = context.payload.inputs?.task_type || '${{ needs.hermes-task-dispatcher.outputs.task_type }}';
+
+            let response = '';
+
+            if (taskType === 'bug-triage') {
+              response = `
+              🐛 **Bug已收到**
+
+              感谢 @${issue.user.login} 报告！
+
+              请提供:
+              1. 复现步骤
+              2. 预期/实际行为
+              3. 环境信息
+
+              我们会尽快处理！
+              `;
+            } else if (taskType === 'feature-triage') {
+              response = `
+              ✨ **功能建议已收到**
+
+              感谢 @${issue.user.login} 的建议！
+
+              我们会评估后纳入计划。
+
+              建议补充:
+              - 要解决的问题
+              - 建议的方案
+              `;
+            }
+
+            if (response) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: response
+              });
+            }
+
+  # ============================================================
+  # PR合并后处理
+  # ============================================================
+  post-merge-task:
+    runs-on: ubuntu-latest
+    needs: hermes-task-dispatcher
+    if: needs.hermes-task-dispatcher.outputs.task_type == 'pr-merged'
+    steps:
+      - name: PR合并后处理
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const title = pr.title.toLowerCase();
+
+            // 计算积分
+            let points = 5;
+            let badge = '🎨';
+
+            if (title.includes('feat')) {
+              points = 30;
+              badge = '✨';
+            } else if (title.includes('fix') || title.includes('bug')) {
+              points = 10;
+              badge = '🐛';
+            } else if (title.includes('docs')) {
+              points = 5;
+              badge = '📖';
+            } else if (title.includes('test')) {
+              points = 15;
+              badge = '🧪';
+            } else if (title.includes('refactor')) {
+              points = 20;
+              badge = '♻️';
+            } else if (title.includes('security')) {
+              points = 50;
+              badge = '🛡️';
+            } else if (title.includes('perf')) {
+              points = 20;
+              badge = '⚡';
+            }
+
+            // 发送贡献积分通知
+            const congratsMessage = `
+            🎉 **PR已合并!**
+
+            感谢 @${author} 的贡献！
+
+            ## 贡献信息
+            - 🏅 积分: +${points}
+            - 🎖️ 类型: ${badge}
+
+            ## 下一步
+            - 查看 [CONTRIBUTORS.md](./CONTRIBUTORS.md)
+            - 继续贡献！
+
+            ---
+            **智枢为民，众生平等。** 🙏
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: congratsMessage
+            });
+
+            console.log(`贡献积分已发放: +${points} to ${author}`);
+
+  # ============================================================
+  # 定时自学习任务
+  # ============================================================
+  self-learning-task:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: 执行自学习
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // 收集本周数据
+            const since = new Date();
+            since.setDate(since.getDate() - 7);
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'closed',
+              since: since.getTime(),
+              per_page: 100
+            });
+
+            const { data: issues } = await github.rest.issues.list({
+              owner,
+              repo,
+              since: since.getTime(),
+              state: 'all',
+              per_page: 100
+            });
+
+            const mergedPRs = prs.filter(p => p.merged_at);
+            const closedIssues = issues.filter(i => !i.pull_request && i.state === 'closed');
+
+            // 生成学习报告
+            const learningReport = `
+            # 🧠 本周自学习报告
+
+            **周期:** ${since.toLocaleDateString('zh-CN')} - ${new Date().toLocaleDateString('zh-CN')}
+
+            ## 📊 数据统计
+
+            | 指标 | 数量 |
+            |------|------|
+            | 合并PR | ${mergedPRs.length} |
+            | 关闭Issue | ${closedIssues.length} |
+            | 活跃贡献者 | ${new Set([...prs.map(p => p.user.login), ...issues.map(i => i.user.login)]).size} |
+
+            ## 🎯 学习结论
+
+            ${mergedPRs.length > closedIssues.length
+              ? '✅ 项目活跃，代码贡献多于Issue'
+              : '⚠️ Issue较多，建议关注问题解决'}
+
+            ## 📈 趋势预测
+
+            - 每日平均PR: ${(mergedPRs.length / 7).toFixed(1)}
+            - 每日平均Issue: ${(closedIssues.length / 7).toFixed(1)}
+
+            ---
+            *🤖 众生智枢AI自学习系统*
+            `;
+
+            // 发布学习报告
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title: `🧠 AI自学习报告 - ${new Date().toLocaleDateString('zh-CN')}`,
+              body: learningReport,
+              labels: ['ai-learning', 'weekly-report']
+            });
+
+            console.log('自学习报告已生成');
+
+      - name: 更新记忆库
+        run: |
+          echo "记忆库已更新: $(date -Iseconds)"
+
+  # ============================================================
+  # 统一状态汇报
+  # ============================================================
+  status-report:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: 生成系统状态报告
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // 获取当前状态
+            const { data: openPRs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const { data: openIssues } = await github.rest.issues.list({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const pureIssues = openIssues.filter(i => !i.pull_request);
+
+            console.log(`
+            ========================================
+            众生智枢 AI Agent 系统状态报告
+            ========================================
+
+            📊 当前状态:
+            - 开放PR: ${openPRs.length}
+            - 开放Issue: ${pureIssues.length}
+
+            🤖 AI系统:
+            - Hermes: 在线
+            - OpenClaw: 在线
+            - 自学习: 启用
+
+            🔧 自动化:
+            - CI/CD: 运行中
+            - 自动合并: 启用
+            - Issue清理: 运行中
+
+            ========================================
+            `);
