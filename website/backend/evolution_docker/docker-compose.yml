@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # 自进化引擎服务
+  evolution-engine:
+    build:
+      context: ./evolution_docker
+      dockerfile: Dockerfile
+    container_name: zhongsheng-evolution
+    ports:
+      - "8001:8000"
+    environment:
+      - EVOLUTION_MODE=production
+      - DATABASE_URL=sqlite:///./data/evolution.db
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    volumes:
+      - evolution-data:/app/data
+      - ../.github:/app/.github:ro
+    networks:
+      - zhongsheng-evolution-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # 主后端服务 (依赖自进化引擎)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zhongsheng-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/zhongsheng.db
+      - EVOLUTION_ENGINE_URL=http://evolution-engine:8000
+    volumes:
+      - backend-data:/app/data
+    depends_on:
+      evolution-engine:
+        condition: service_healthy
+    networks:
+      - zhongsheng-evolution-net
+    restart: unless-stopped
+
+networks:
+  zhongsheng-evolution-net:
+    driver: bridge
+
+volumes:
+  evolution-data:
+  backend-data:

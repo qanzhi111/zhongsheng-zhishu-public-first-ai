@@ -625,3 +625,198 @@ async def get_self_learning_status():
         "evolution": "enabled",
         "last_update": datetime.now().isoformat()
     }
+
+# ============================================================================
+# API路由 - 自进化引擎
+# ============================================================================
+
+@app.get("/api/evolution/status")
+async def get_evolution_status():
+    """
+    获取自进化引擎状态
+    """
+    try:
+        from evolution_engine import get_evolution_engine
+        from evolution_scheduler import EvolutionScheduler
+
+        engine = get_evolution_engine()
+        scheduler = EvolutionScheduler()
+
+        return {
+            "engine_status": "running",
+            "scheduler_status": scheduler.get_status(),
+            "capabilities": [
+                "pattern_recognition",
+                "knowledge_refinement",
+                "response_generation",
+                "self_learning"
+            ],
+            "last_update": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "engine_status": "initializing",
+            "error": str(e),
+            "last_update": datetime.now().isoformat()
+        }
+
+
+@app.get("/api/evolution/trends")
+async def get_evolution_trends(days: int = 7):
+    """
+    获取热门趋势
+    """
+    try:
+        from evolution_engine import get_evolution_engine
+        engine = get_evolution_engine()
+        trends = engine.get_trending_topics(days=days)
+        return {"trends": trends, "period_days": days}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/evolution/patterns")
+async def get_patterns(pattern_type: str = None):
+    """
+    获取已学习的模式
+    """
+    try:
+        from evolution_engine import get_evolution_engine
+        engine = get_evolution_engine()
+
+        if pattern_type:
+            # 获取特定类型的模式
+            patterns = engine.recognize_pattern(pattern_type)
+        else:
+            # 获取所有趋势
+            patterns = engine.get_trending_topics()
+
+        return {"patterns": patterns}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/evolution/learn/pr")
+async def learn_from_pr(pr_data: dict):
+    """
+    从PR数据中学习
+    """
+    try:
+        from evolution_engine import get_evolution_engine
+        engine = get_evolution_engine()
+        result = engine.learn_from_pr(pr_data)
+        return {"status": "learned", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/evolution/learn/issue")
+async def learn_from_issue(issue_data: dict):
+    """
+    从Issue数据中学习
+    """
+    try:
+        from evolution_engine import get_evolution_engine
+        engine = get_evolution_engine()
+        result = engine.learn_from_issue(issue_data)
+        return {"status": "learned", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/evolution/learn/feedback")
+async def submit_feedback(context: str, action: str, outcome: str = None, feedback: float = 0.0):
+    """
+    提交学习反馈
+    """
+    try:
+        from evolution_engine import get_evolution_engine
+        engine = get_evolution_engine()
+        result = engine.learn_from_feedback(context, action, outcome, feedback)
+        return {"status": "feedback_recorded", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/evolution/refine")
+async def refine_knowledge():
+    """
+    触发知识精炼
+    """
+    try:
+        from evolution_engine import get_evolution_engine
+        engine = get_evolution_engine()
+        result = engine.refine_knowledge()
+        return {"status": "refined", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/evolution/generate-response")
+async def generate_response(event_type: str, context: dict = None):
+    """
+    生成智能响应
+    """
+    try:
+        from response_generator import get_response_generator
+        generator = get_response_generator()
+
+        if event_type == "pr":
+            response = generator.generate_pr_response(context or {})
+        elif event_type == "issue":
+            response = generator.generate_issue_response(context or {})
+        elif event_type == "merged":
+            response = generator.generate_merged_response(
+                context or {},
+                context.get("points", 5),
+                context.get("badge", "🎨")
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unknown event type")
+
+        return {"response": response, "type": event_type}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/evolution/statistics")
+async def get_evolution_statistics():
+    """
+    获取自进化统计
+    """
+    try:
+        from evolution_engine import get_evolution_engine
+        from github_collector import get_github_collector
+
+        engine = get_evolution_engine()
+        collector = get_github_collector()
+
+        engine_stats = engine.get_recent_learning_stats(days=7)
+        github_data = collector.get_learning_data(days=7)
+
+        return {
+            "evolution_engine": engine_stats,
+            "github_activity": github_data,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+
+@app.post("/api/evolution/trigger/{task_name}")
+async def trigger_evolution_task(task_name: str):
+    """
+    手动触发进化任务
+    """
+    try:
+        from evolution_scheduler import EvolutionScheduler
+        scheduler = EvolutionScheduler()
+        result = scheduler.trigger_task(task_name)
+        return {"status": "triggered" if result else "failed", "task": task_name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
