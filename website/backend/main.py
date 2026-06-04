@@ -519,3 +519,109 @@ async def get_emergency_alerts(db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+# ============================================================================
+# API路由 - AI自我学习与记忆系统
+# ============================================================================
+
+@app.get("/api/memory/stats")
+async def get_learning_stats():
+    """
+    获取AI学习统计
+    """
+    try:
+        from memory_store import get_memory_store
+        store = get_memory_store()
+
+        week_stats = store.get_recent_learning_stats(days=7)
+        skill_stats = store.get_skill_stats()
+        patterns = store.get_common_patterns(limit=10)
+
+        return {
+            "week_stats": week_stats,
+            "skill_stats": skill_stats,
+            "common_patterns": patterns,
+            "system_status": "learning"
+        }
+    except Exception as e:
+        return {
+            "week_stats": {},
+            "skill_stats": {},
+            "common_patterns": [],
+            "system_status": "initializing",
+            "error": str(e)
+        }
+
+
+@app.get("/api/memory/patterns")
+async def get_memory_patterns(limit: int = 10):
+    """
+    获取常用模式
+    """
+    try:
+        from memory_store import get_memory_store
+        store = get_memory_store()
+        patterns = store.get_common_patterns(limit=limit)
+        return {"patterns": patterns}
+    except Exception as e:
+        return {"patterns": [], "error": str(e)}
+
+
+@app.get("/api/memory/templates/{template_type}")
+async def get_response_template(template_type: str, keywords: str = None):
+    """
+    获取响应模板
+    """
+    try:
+        from memory_store import get_memory_store
+        store = get_memory_store()
+
+        kw_list = keywords.split(",") if keywords else None
+        template = store.get_response_template(template_type, kw_list)
+
+        return {
+            "template_type": template_type,
+            "template": template,
+            "found": template is not None
+        }
+    except Exception as e:
+        return {"template": None, "error": str(e)}
+
+
+@app.post("/api/memory/decisions")
+async def record_memory_decision(
+    decision_type: str,
+    context: str,
+    action: str,
+    outcome: str = None
+):
+    """
+    记录AI决策到记忆库
+    """
+    try:
+        from memory_store import get_memory_store
+        store = get_memory_store()
+        store.record_decision(decision_type, context, action, outcome)
+        return {"status": "recorded", "decision_type": decision_type}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/ai/self-learning-status")
+async def get_self_learning_status():
+    """
+    获取AI自我学习系统状态
+    """
+    return {
+        "status": "active",
+        "capabilities": [
+            "pattern_recognition",
+            "decision_memory",
+            "response_template",
+            "skill_tracking",
+            "workload_prediction"
+        ],
+        "memory_size": "growing",
+        "evolution": "enabled",
+        "last_update": datetime.now().isoformat()
+    }

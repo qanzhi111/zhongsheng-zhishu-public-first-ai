@@ -1,0 +1,50 @@
+# OpenClaw 配置 (供后续集成参考)
+# 此文件定义了项目的OpenClaw集成配置
+
+project:
+  name: "众生智枢"
+  type: "public-first-ai"
+  mission: "为人民服务，全民普惠"
+
+# 消息平台集成
+platforms:
+  enabled:
+    - telegram
+    - discord
+    - slack
+  planned:
+    - feishu
+    - wecom
+
+# 记忆配置
+memory:
+  type: "persistent"
+  max_context: 1300
+  session_limit: 2200
+
+# 技能库
+skills:
+  categories:
+    - code_review
+    - bug_analysis
+    - documentation
+    - community_support
+    - governance
+
+# 安全约束
+safety:
+  pre_approved_actions: []
+  require_human_review:
+    - security_decisions
+    - policy_changes
+    - new_feature_deployment
+  blocked_keywords:
+    - monopoly
+    - profit_protection
+    - harm_majority
+
+# 学习配置
+learning:
+  track_patterns: true
+  auto_generate_skills: true
+  feedback_collection: true

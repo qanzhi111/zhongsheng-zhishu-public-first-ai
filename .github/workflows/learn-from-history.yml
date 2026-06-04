@@ -1,0 +1,253 @@
+name: "AI自我学习工作流"
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 每天凌晨2点（北京时间）
+  workflow_dispatch:
+  repository_dispatch:
+    types: [learn-from-activity]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  learn-from-pr-history:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 学习PR历史模式
+        id: learn-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // 获取最近100个已合并的PR
+            const { data: mergedPRs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'closed',
+              per_page: 100,
+              sort: 'updated',
+              direction: 'desc'
+            });
+
+            const patternCounts = {
+              feature: 0,
+              bugfix: 0,
+              documentation: 0,
+              refactor: 0,
+              dependency: 0,
+              performance: 0,
+              security: 0
+            };
+
+            const mergeTimeStats = [];
+
+            for (const pr of mergedPRs) {
+              if (!pr.merged_at) continue;
+
+              const title = pr.title.toLowerCase();
+
+              // 识别PR类型
+              if (title.includes('feat') || title.includes('add') || title.includes('new')) {
+                patternCounts.feature++;
+              }
+              if (title.includes('fix') || title.includes('bug')) {
+                patternCounts.bugfix++;
+              }
+              if (title.includes('docs') || title.includes('doc')) {
+                patternCounts.documentation++;
+              }
+              if (title.includes('refactor')) {
+                patternCounts.refactor++;
+              }
+              if (title.includes('deps') || title.includes('depend')) {
+                patternCounts.dependency++;
+              }
+              if (title.includes('perf') || title.includes('performance')) {
+                patternCounts.performance++;
+              }
+              if (title.includes('security')) {
+                patternCounts.security++;
+              }
+
+              // 计算合并时间
+              const created = new Date(pr.created_at);
+              const merged = new Date(pr.merged_at);
+              const hours = (merged - created) / (1000 * 60 * 60);
+              mergeTimeStats.push(hours);
+            }
+
+            // 计算平均合并时间
+            const avgMergeTime = mergeTimeStats.length > 0
+              ? mergeTimeStats.reduce((a, b) => a + b, 0) / mergeTimeStats.length
+              : 0;
+
+            // 生成学习报告
+            const total = Object.values(patternCounts).reduce((a, b) => a + b, 0);
+
+            const report = `
+            # 🧠 AI 学习报告 - PR模式分析
+
+            **生成时间:** ${new Date().toLocaleString('zh-CN')}
+
+            ## 📊 PR类型分布
+
+            | 类型 | 数量 | 占比 |
+            |------|------|------|
+            | ✨ 新功能 | ${patternCounts.feature} | ${total > 0 ? (patternCounts.feature / total * 100).toFixed(1) : 0}% |
+            | 🐛 Bug修复 | ${patternCounts.bugfix} | ${total > 0 ? (patternCounts.bugfix / total * 100).toFixed(1) : 0}% |
+            | 📖 文档 | ${patternCounts.documentation} | ${total > 0 ? (patternCounts.documentation / total * 100).toFixed(1) : 0}% |
+            | ♻️ 重构 | ${patternCounts.refactor} | ${total > 0 ? (patternCounts.refactor / total * 100).toFixed(1) : 0}% |
+            | 📦 依赖 | ${patternCounts.dependency} | ${total > 0 ? (patternCounts.dependency / total * 100).toFixed(1) : 0}% |
+            | ⚡ 性能 | ${patternCounts.performance} | ${total > 0 ? (patternCounts.performance / total * 100).toFixed(1) : 0}% |
+            | 🛡️ 安全 | ${patternCounts.security} | ${total > 0 ? (patternCounts.security / total * 100).toFixed(1) : 0}% |
+
+            ## ⏱️ 处理效率
+
+            - **分析PR数量:** ${mergedPRs.length}
+            - **平均合并时间:** ${avgMergeTime.toFixed(1)} 小时
+
+            ## 🎯 学习结论
+
+            ${patternCounts.feature > patternCounts.bugfix
+              ? '✅ 项目以功能开发为主，建议继续优化新功能流程'
+              : '⚠️ Bug修复较多，建议加强代码审查和测试覆盖'}
+
+            ${avgMergeTime > 72
+              ? '⚠️ 平均合并时间较长 (>3天)，建议优化审查流程'
+              : '✅ 合并效率良好'}
+
+            ---
+            *由 AI 自动生成*
+            `;
+
+            // 创建学习报告Issue
+            try {
+              const { data: issue } = await github.rest.issues.create({
+                owner,
+                repo,
+                title: `🧠 AI学习报告 - ${new Date().toLocaleDateString('zh-CN')}`,
+                body: report,
+                labels: ['ai-learning', 'report']
+              });
+
+              console.log('学习报告已创建:', issue.html_url);
+              core.setOutput('report_url', issue.html_url);
+            } catch (error) {
+              console.log('创建学习报告失败:', error.message);
+            }
+
+            // 输出统计数据供其他Job使用
+            core.setOutput('total_prs', total.toString());
+            core.setOutput('avg_merge_time', avgMergeTime.toString());
+
+  learn-from-issue-history:
+    runs-on: ubuntu-latest
+    needs: learn-from-pr-history
+    steps:
+      - name: 学习Issue历史模式
+        id: learn-issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // 获取最近100个Issue
+            const { data: issues } = await github.rest.issues.list({
+              owner,
+              repo,
+              state: 'all',
+              per_page: 100,
+              sort: 'updated',
+              direction: 'desc'
+            });
+
+            const responseTimes = [];
+            const resolutionRates = {
+              total: 0,
+              closed: 0,
+              bug: { total: 0, closed: 0 },
+              enhancement: { total: 0, closed: 0 },
+              question: { total: 0, closed: 0 }
+            };
+
+            for (const issue of issues) {
+              if (issue.pull_request) continue; // 跳过PR
+
+              resolutionRates.total++;
+              const labels = issue.labels.map(l => l.name);
+
+              // 分类统计
+              if (labels.includes('bug')) {
+                resolutionRates.bug.total++;
+                if (issue.state === 'closed') resolutionRates.bug.closed++;
+              }
+              if (labels.includes('enhancement')) {
+                resolutionRates.enhancement.total++;
+                if (issue.state === 'closed') resolutionRates.enhancement.closed++;
+              }
+              if (labels.includes('question')) {
+                resolutionRates.question.total++;
+                if (issue.state === 'closed') resolutionRates.question.closed++;
+              }
+
+              if (issue.state === 'closed' && issue.closed_at) {
+                resolutionRates.closed++;
+                const created = new Date(issue.created_at);
+                const closed = new Date(issue.closed_at);
+                const hours = (closed - created) / (1000 * 60 * 60);
+                responseTimes.push(hours);
+              }
+            }
+
+            const avgResponseTime = responseTimes.length > 0
+              ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
+              : 0;
+
+            const overallResolutionRate = resolutionRates.total > 0
+              ? (resolutionRates.closed / resolutionRates.total * 100).toFixed(1)
+              : 0;
+
+            console.log('Issue学习完成');
+            console.log(`总Issue: ${resolutionRates.total}`);
+            console.log(`平均响应时间: ${avgResponseTime.toFixed(1)}小时`);
+            console.log(`总体解决率: ${overallResolutionRate}%`);
+
+            core.setOutput('total_issues', resolutionRates.total.toString());
+            core.setOutput('avg_response_time', avgResponseTime.toString());
+            core.setOutput('resolution_rate', overallResolutionRate);
+
+  update-learning-database:
+    runs-on: ubuntu-latest
+    needs: [learn-from-pr-history, learn-from-issue-history]
+    steps:
+      - name: 更新学习数据库
+        run: |
+          echo "学习数据已更新"
+          echo "PR统计: ${{ needs.learn-from-pr-history.outputs.total_prs }}"
+          echo "Issue统计: ${{ needs.learn-from-issue-history.outputs.total_issues }}"
+          echo "平均响应时间: ${{ needs.learn-from-issue-history.outputs.avg_response_time }}小时"
+
+      - name: 生成学习建议
+        if: needs.learn-from-issue-history.outputs.resolution_rate != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const resolutionRate = parseFloat('${{ needs.learn-from-issue-history.outputs.resolution_rate }}');
+
+            let suggestions = [];
+
+            if (resolutionRate < 50) {
+              suggestions.push('⚠️ Issue解决率较低，建议增加人手或优化流程');
+            }
+            if (resolutionRate > 80) {
+              suggestions.push('✅ Issue解决率良好!');
+            }
+
+            console.log('学习建议:', suggestions.join('\\n'));

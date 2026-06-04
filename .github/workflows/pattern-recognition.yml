@@ -1,0 +1,289 @@
+name: "决策模式识别"
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 每天凌晨3点
+  workflow_dispatch:
+  repository_dispatch:
+    types: [analyze-patterns]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  analyze-review-patterns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 分析代码审查模式
+        id: review-analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // 获取最近200个PR的分析
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'all',
+              per_page: 100,
+              sort: 'updated',
+              direction: 'desc'
+            });
+
+            // 分析模式
+            const patterns = {
+              fastMerge: [],      // 快速合并 (<1小时)
+              slowMerge: [],      // 慢速合并 (>7天)
+              needsChanges: [],   // 需要修改
+              noReview: [],       // 无审查合并
+              autoMerged: []      // 自动合并
+            };
+
+            for (const pr of prs) {
+              if (!pr.merged_at) continue;
+
+              const created = new Date(pr.created_at);
+              const merged = new Date(pr.merged_at);
+              const hours = (merged - created) / (1000 * 60 * 60);
+
+              const prInfo = {
+                number: pr.number,
+                title: pr.title,
+                hours: hours,
+                author: pr.user.login
+              };
+
+              if (hours < 1) {
+                patterns.fastMerge.push(prInfo);
+              } else if (hours > 168) { // 7天
+                patterns.slowMerge.push(prInfo);
+              }
+
+              // 检查是否有审查
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner,
+                repo,
+                pull_number: pr.number
+              });
+
+              if (reviews.length === 0 && pr.merged) {
+                patterns.noReview.push(prInfo);
+              }
+
+              // 检查是否自动合并
+              if (pr.labels.some(l => l.name === 'automerge') && pr.merged) {
+                patterns.autoMerged.push(prInfo);
+              }
+            }
+
+            // 生成分析报告
+            const report = `
+            # 🔍 代码审查模式分析报告
+
+            **生成时间:** ${new Date().toLocaleString('zh-CN')}
+            **分析范围:** 最近 ${prs.length} 个PR
+
+            ## 📊 快速合并分析 (<1小时)
+
+            | 数量 | 占比 |
+            |------|------|
+            | ${patterns.fastMerge.length} | ${(patterns.fastMerge.length / prs.length * 100).toFixed(1)}% |
+
+            ${patterns.fastMerge.length > 0 ? patterns.fastMerge.slice(0, 3).map(p =>
+              `- #${p.number} @${p.author} (${p.hours.toFixed(1)}小时)`
+            ).join('\n') : ''}
+
+            ## ⚠️ 慢速合并分析 (>7天)
+
+            | 数量 | 占比 |
+            |------|------|
+            | ${patterns.slowMerge.length} | ${(patterns.slowMerge.length / prs.length * 100).toFixed(1)}% |
+
+            ${patterns.slowMerge.length > 0 ? patterns.slowMerge.slice(0, 5).map(p =>
+              `- #${p.number} @${p.author} (${(p.hours/24).toFixed(1)}天)`
+            ).join('\n') : ''}
+
+            ## 🔓 无审查合并
+
+            | 数量 | 占比 |
+            |------|------|
+            | ${patterns.noReview.length} | ${(patterns.noReview.length / prs.length * 100).toFixed(1)}% |
+
+            ${patterns.noReview.length > 0 ? `
+            ⚠️ **注意:** 这些PR没有经过代码审查就合并了。
+
+            ${patterns.noReview.slice(0, 5).map(p => `- #${p.number} @${p.author}`).join('\n')}
+            ` : '✅ 所有PR都经过了代码审查'}
+
+            ## 🤖 自动合并
+
+            | 数量 | 占比 |
+            |------|------|
+            | ${patterns.autoMerged.length} | ${(patterns.autoMerged.length / prs.length * 100).toFixed(1)}% |
+
+            ${patterns.autoMerged.length > 0 ? `
+            ✅ 自动合并系统运行正常
+            ` : 'ℹ️ 暂无自动合并记录'}
+
+            ## 💡 优化建议
+
+            ${patterns.slowMerge.length > 10
+              ? '⚠️ 慢速合并过多，建议:\n1. 增加审查者数量\n2. 简化PR规模\n3. 设置合并超时提醒'
+              : '✅ 合并效率在合理范围内'}
+
+            ${patterns.noReview.length > 5
+              ? '⚠️ 无审查合并过多，建议:\n1. 启用必读审查规则\n2. 对大PR强制审查\n3. 添加审查者分配自动化'
+              : '✅ 代码审查覆盖率良好'}
+
+            ---
+            *🔮 AI模式识别系统生成*
+            `;
+
+            // 发布报告
+            const { data: issue } = await github.rest.issues.create({
+              owner,
+              repo,
+              title: `🔍 模式分析报告 - ${new Date().toLocaleDateString('zh-CN')}`,
+              body: report,
+              labels: ['pattern-analysis', 'ai-generated']
+            });
+
+            console.log('分析报告已创建:', issue.html_url);
+            core.setOutput('report_url', issue.html_url);
+            core.setOutput('slow_merge_count', patterns.slowMerge.length.toString());
+
+  analyze-issue-patterns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 分析Issue处理模式
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            const { data: issues } = await github.rest.issues.list({
+              owner,
+              repo,
+              state: 'all',
+              per_page: 100,
+              sort: 'updated',
+              direction: 'desc'
+            });
+
+            // 过滤掉PR
+            const pureIssues = issues.filter(i => !i.pull_request);
+
+            const patterns = {
+              byLabel: {},
+              responseTime: [],
+              resolutionRate: { total: 0, closed: 0 },
+              authors: {}
+            };
+
+            for (const issue of pureIssues) {
+              // 按标签统计
+              for (const label of issue.labels) {
+                if (!patterns.byLabel[label.name]) {
+                  patterns.byLabel[label.name] = 0;
+                }
+                patterns.byLabel[label.name]++;
+              }
+
+              // 响应时间
+              if (issue.state === 'closed' && issue.closed_at) {
+                patterns.resolutionRate.closed++;
+                const created = new Date(issue.created_at);
+                const closed = new Date(issue.closed_at);
+                const hours = (closed - created) / (1000 * 60 * 60);
+                patterns.responseTime.push(hours);
+              }
+              patterns.resolutionRate.total++;
+
+              // 作者统计
+              const author = issue.user.login;
+              if (!patterns.authors[author]) {
+                patterns.authors[author] = { issues: 0, closed: 0 };
+              }
+              patterns.authors[author].issues++;
+              if (issue.state === 'closed') {
+                patterns.authors[author].closed++;
+              }
+            }
+
+            // 平均响应时间
+            const avgResponseTime = patterns.responseTime.length > 0
+              ? patterns.resolutionRate.total > 0
+                ? patterns.responseTime.reduce((a, b) => a + b, 0) / patterns.responseTime.length
+                : 0
+              : 0;
+
+            // Top贡献者
+            const topAuthors = Object.entries(patterns.authors)
+              .sort((a, b) => b[1].issues - a[1].issues)
+              .slice(0, 5);
+
+            console.log('Issue模式分析完成');
+            console.log(`总Issue: ${patterns.resolutionRate.total}`);
+            console.log(`解决率: ${(patterns.resolutionRate.closed / patterns.resolutionRate.total * 100).toFixed(1)}%`);
+            console.log(`平均响应时间: ${avgResponseTime.toFixed(1)}小时`);
+
+            // Top标签
+            const topLabels = Object.entries(patterns.byLabel)
+              .filter(([name]) => !name.includes(' ') && name.length < 30)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 10);
+
+            core.setOutput('total_issues', patterns.resolutionRate.total.toString());
+            core.setOutput('resolution_rate', (patterns.resolutionRate.closed / patterns.resolutionRate.total * 100).toFixed(1));
+            core.setOutput('avg_response_time', avgResponseTime.toFixed(1));
+            core.setOutput('top_label', topLabels[0]?.[0] || 'none');
+
+  predict-workload:
+    runs-on: ubuntu-latest
+    needs: [analyze-review-patterns, analyze-issue-patterns]
+    steps:
+      - name: 预测工作负载
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // 获取最近30天的数据趋势
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            const { data: issues } = await github.rest.issues.list({
+              owner,
+              repo,
+              since: thirtyDaysAgo.getTime(),
+              state: 'all',
+              per_page: 100
+            });
+
+            const pureIssues = issues.filter(i => !i.pull_request);
+            const newThisWeek = pureIssues.filter(i =>
+              new Date(i.created_at) >= thirtyDaysAgo
+            ).length;
+
+            // 计算每日平均
+            const dailyAvg = newThisWeek / 30;
+
+            // 预测
+            const prediction = {
+              daily_new: dailyAvg.toFixed(1),
+              weekly_predicted: Math.round(dailyAvg * 7),
+              monthly_predicted: Math.round(dailyAvg * 30)
+            };
+
+            console.log('工作负载预测:');
+            console.log(`每日新增: ${prediction.daily_new}`);
+            console.log(`周预测: ${prediction.weekly_predicted}`);
+            console.log(`月预测: ${prediction.monthly_predicted}`);
+
+            // 更新数据库
+            core.setOutput('daily_avg', prediction.daily_new);
+            core.setOutput('weekly_prediction', prediction.weekly_predicted.toString());
+            core.setOutput('monthly_prediction', prediction.monthly_predicted.toString());
