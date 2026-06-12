@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Alert, Tag, Button, Space, Typography, Descriptions, Badge, Timeline, Modal, Result } from 'antd';
+import { Card, Alert, Tag, Button, Space, Typography, Descriptions, Badge, Timeline, Modal, Result, message } from 'antd';
 import { 
   AlertOutlined, 
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
   WarningOutlined,
-  SafetyOutlined
+  SafetyOutlined,
+  ReloadOutlined,
+  CheckOutlined
 } from '@ant-design/icons';
+import { getEmergencyAlerts, resolveAlert } from '../api/client';
 import './EmergencyAlerts.css';
 
 const { Title, Text, Paragraph } = Typography;
@@ -15,8 +18,10 @@ const { Title, Text, Paragraph } = Typography;
 const EmergencyAlerts = () => {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState(null);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     fetchAlerts();
@@ -26,14 +31,32 @@ const EmergencyAlerts = () => {
 
   const fetchAlerts = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch('http://localhost:8000/api/emergency-alerts');
-      const data = await response.json();
+      const data = await getEmergencyAlerts();
       setAlerts(data.alerts || []);
-    } catch (error) {
-      console.error('获取紧急警报失败:', error);
+    } catch (err) {
+      console.error('获取紧急警报失败:', err);
+      setError(err.message || '获取数据失败');
     }
     setLoading(false);
+  };
+
+  const handleResolveAlert = async (alertId) => {
+    setResolving(true);
+    try {
+      await resolveAlert(alertId);
+      message.success('警报已解决！');
+      fetchAlerts();
+      if (selectedAlert?.id === alertId) {
+        setDetailModalVisible(false);
+        setSelectedAlert(null);
+      }
+    } catch (err) {
+      console.error('解决警报失败:', err);
+      message.error(err.message || '解决失败，请重试');
+    }
+    setResolving(false);
   };
 
   const severityMap = {
@@ -61,20 +84,41 @@ const EmergencyAlerts = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('zh-CN');
+    return dateString ? new Date(dateString).toLocaleString('zh-CN') : '-';
   };
 
   return (
     <div className="alerts-container">
       <div className="alerts-header">
-        <Title level={2}>
-          <AlertOutlined style={{ color: '#ff4d4f', marginRight: 10 }} />
-          紧急警报中心
-        </Title>
-        <Paragraph type="secondary">
-          实时监控 · 紧急响应 · 全民监督
-        </Paragraph>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <Title level={2}>
+              <AlertOutlined style={{ color: '#ff4d4f', marginRight: 10 }} />
+              紧急警报中心
+            </Title>
+            <Paragraph type="secondary">
+              实时监控 · 紧急响应 · 全民监督
+            </Paragraph>
+          </div>
+          <Button 
+            icon={<ReloadOutlined />} 
+            onClick={fetchAlerts}
+            loading={loading}
+          >
+            刷新
+          </Button>
+        </div>
       </div>
+
+      {error && (
+        <Alert
+          message="加载失败"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+      )}
 
       {alerts.length === 0 ? (
         <Card>
@@ -188,13 +232,23 @@ const EmergencyAlerts = () => {
                       )}
                     </div>
                     
-                    <Button 
-                      type="link" 
-                      icon={<AlertOutlined />}
-                      onClick={() => handleViewDetails(alert)}
-                    >
-                      查看详情
-                    </Button>
+                    <Space>
+                      <Button 
+                        type="primary"
+                        icon={<CheckOutlined />}
+                        onClick={() => handleResolveAlert(alert.id)}
+                        loading={resolving}
+                      >
+                        解决警报
+                      </Button>
+                      <Button 
+                        type="link" 
+                        icon={<AlertOutlined />}
+                        onClick={() => handleViewDetails(alert)}
+                      >
+                        查看详情
+                      </Button>
+                    </Space>
                   </div>
                 </Card>
               );
@@ -302,6 +356,15 @@ const EmergencyAlerts = () => {
         footer={[
           <Button key="close" onClick={() => setDetailModalVisible(false)}>
             关闭
+          </Button>,
+          <Button 
+            key="resolve" 
+            type="primary" 
+            icon={<CheckOutlined />}
+            onClick={() => selectedAlert && handleResolveAlert(selectedAlert.id)}
+            loading={resolving}
+          >
+            解决警报
           </Button>,
           <Button key="refresh" onClick={fetchAlerts}>
             刷新列表

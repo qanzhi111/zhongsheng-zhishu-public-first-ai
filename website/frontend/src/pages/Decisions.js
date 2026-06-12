@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Tag, Button, Space, Typography, Descriptions, Modal, Collapse, Badge } from 'antd';
+import { Table, Card, Tag, Button, Space, Typography, Descriptions, Modal, Collapse, Badge, Alert } from 'antd';
 import { 
   FileProtectOutlined, 
   EyeOutlined, 
   CheckCircleOutlined, 
   ExclamationCircleOutlined 
 } from '@ant-design/icons';
+import { getDecisions, getDecision } from '../api/client';
 import './Decisions.css';
 
 const { Title, Text, Paragraph } = Typography;
-const { Panel } = Collapse;
 
 const Decisions = () => {
   const [decisions, setDecisions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 });
   const [selectedDecision, setSelectedDecision] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -24,25 +25,26 @@ const Decisions = () => {
 
   const fetchDecisions = async (page = 1) => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch(`http://localhost:8000/api/decisions?skip=${(page - 1) * pagination.pageSize}&limit=${pagination.pageSize}`);
-      const data = await response.json();
+      const data = await getDecisions((page - 1) * pagination.pageSize, pagination.pageSize);
       setDecisions(data.decisions || []);
       setPagination(prev => ({ ...prev, total: data.total, current: page }));
-    } catch (error) {
-      console.error('获取决策列表失败:', error);
+    } catch (err) {
+      console.error('获取决策列表失败:', err);
+      setError(err.message || '获取数据失败');
     }
     setLoading(false);
   };
 
   const handleViewDetails = async (decision) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/decisions/${decision.id}`);
-      const data = await response.json();
+      const data = await getDecision(decision.id);
       setSelectedDecision(data);
       setModalVisible(true);
-    } catch (error) {
-      console.error('获取决策详情失败:', error);
+    } catch (err) {
+      console.error('获取决策详情失败:', err);
+      setError(err.message || '获取详情失败');
     }
   };
 
@@ -85,10 +87,10 @@ const Decisions = () => {
       width: 150,
       render: (score) => (
         <Tag color={getScoreColor(score)}>
-          {score.toFixed(1)}/100
+          {(score || 0).toFixed(1)}/100
         </Tag>
       ),
-      sorter: (a, b) => a.public_value_score - b.public_value_score,
+      sorter: (a, b) => (a.public_value_score || 0) - (b.public_value_score || 0),
     },
     {
       title: '约束状态',
@@ -111,8 +113,8 @@ const Decisions = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (time) => new Date(time).toLocaleString('zh-CN'),
-      sorter: (a, b) => new Date(a.created_at) - new Date(b.created_at),
+      render: (time) => time ? new Date(time).toLocaleString('zh-CN') : '-',
+      sorter: (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0),
     },
     {
       title: '操作',
@@ -137,6 +139,25 @@ const Decisions = () => {
     }
   };
 
+  // 用于Collapse的items属性（新API）
+  const collapseItems = [
+    {
+      key: 'rationale',
+      label: '决策理由',
+      children: (
+        <pre style={{ 
+          background: '#f5f5f5', 
+          padding: 12, 
+          borderRadius: 4,
+          whiteSpace: 'pre-wrap',
+          fontSize: 12
+        }}>
+          {selectedDecision?.rationale || '暂无理由说明'}
+        </pre>
+      ),
+    },
+  ];
+
   return (
     <div className="decisions-container">
       <div className="decisions-header">
@@ -148,6 +169,16 @@ const Decisions = () => {
           所有AI决策均经过为民价值评估和约束检查，完全透明可审计
         </Paragraph>
       </div>
+
+      {error && (
+        <Alert
+          message="加载失败"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+      )}
 
       <Card>
         <Table
@@ -169,7 +200,7 @@ const Decisions = () => {
                   <Descriptions.Item label="受益人群">{record.beneficiaries || '未知'}</Descriptions.Item>
                   <Descriptions.Item label="公共价值评分">
                     <Badge status={getScoreColor(record.public_value_score) === 'green' ? 'success' : 'processing'} />
-                    {record.public_value_score.toFixed(1)}/100
+                    {(record.public_value_score || 0).toFixed(1)}/100
                   </Descriptions.Item>
                 </Descriptions>
               </div>
@@ -209,27 +240,15 @@ const Decisions = () => {
               </Descriptions.Item>
               <Descriptions.Item label="公共价值评分" span={2}>
                 <Tag color={getScoreColor(selectedDecision.public_value_score)}>
-                  {selectedDecision.public_value_score.toFixed(1)}/100
+                  {(selectedDecision.public_value_score || 0).toFixed(1)}/100
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="创建时间" span={2}>
-                {new Date(selectedDecision.created_at).toLocaleString('zh-CN')}
+                {selectedDecision.created_at ? new Date(selectedDecision.created_at).toLocaleString('zh-CN') : '-'}
               </Descriptions.Item>
             </Descriptions>
 
-            <Collapse style={{ marginTop: 16 }}>
-              <Panel header="决策理由" key="rationale">
-                <pre style={{ 
-                  background: '#f5f5f5', 
-                  padding: 12, 
-                  borderRadius: 4,
-                  whiteSpace: 'pre-wrap',
-                  fontSize: 12
-                }}>
-                  {selectedDecision.rationale || '暂无理由说明'}
-                </pre>
-              </Panel>
-            </Collapse>
+            <Collapse style={{ marginTop: 16 }} items={collapseItems} />
           </div>
         )}
       </Modal>

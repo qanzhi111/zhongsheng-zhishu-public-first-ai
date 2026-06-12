@@ -1,0 +1,24 @@
+# Render Blueprint
+# 部署众生智枢后端服务
+
+services:
+  - type: web
+    name: zhongsheng-backend
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: cd website/backend && pip install -r requirements.txt
+    startCommand: cd website/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: "*"
+        # 生产环境建议:
+        # - key: CORS_ORIGINS
+        #   value: "https://your-frontend-domain.com"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DEBUG
+        value: "false"

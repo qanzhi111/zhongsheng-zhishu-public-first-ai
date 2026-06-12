@@ -5,8 +5,10 @@ import {
   WarningOutlined,
   EyeOutlined,
   PlusOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
+import { getViolations, createViolation } from '../api/client';
 import './ViolationReports.css';
 
 const { Title, Text, Paragraph } = Typography;
@@ -16,6 +18,7 @@ const { Option } = Select;
 const ViolationReports = () => {
   const [violations, setViolations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedViolation, setSelectedViolation] = useState(null);
   const [form] = Form.useForm();
@@ -26,40 +29,36 @@ const ViolationReports = () => {
 
   const fetchViolations = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch('http://localhost:8000/api/violations');
-      const data = await response.json();
+      const data = await getViolations(0, 100);
       setViolations(data.violations || []);
-    } catch (error) {
-      console.error('获取违规报告失败:', error);
+    } catch (err) {
+      console.error('获取违规报告失败:', err);
+      setError(err.message || '获取数据失败');
     }
     setLoading(false);
   };
 
   const handleCreateViolation = async (values) => {
     try {
-      const response = await fetch('http://localhost:8000/api/violations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...values,
-          decision_id: values.decision_id || null,
-          reporter_id: values.reporter_id || `reporter_${Date.now()}`,
-          is_anonymous: values.is_anonymous || false
-        }),
-      });
-
-      if (response.ok) {
-        message.success('违规报告提交成功！');
-        setModalVisible(false);
-        form.resetFields();
-        fetchViolations();
-      } else {
-        message.error('提交失败，请重试');
-      }
-    } catch (error) {
-      message.error('提交违规报告时出错');
-      console.error(error);
+      const violationData = {
+        decision_id: values.decision_id ? parseInt(values.decision_id, 10) : null,
+        violated_law: values.violated_law,
+        description: values.description,
+        severity: values.severity,
+        reporter_id: values.reporter_id || `reporter_${Date.now()}`,
+        is_anonymous: values.is_anonymous || false
+      };
+      
+      await createViolation(violationData);
+      message.success('违规报告提交成功！');
+      setModalVisible(false);
+      form.resetFields();
+      fetchViolations(); // 刷新数据
+    } catch (err) {
+      console.error('提交违规报告失败:', err);
+      message.error(err.message || '提交失败，请重试');
     }
   };
 
@@ -147,8 +146,8 @@ const ViolationReports = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (time) => new Date(time).toLocaleString('zh-CN'),
-      sorter: (a, b) => new Date(a.created_at) - new Date(b.created_at),
+      render: (time) => time ? new Date(time).toLocaleString('zh-CN') : '-',
+      sorter: (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0),
     },
     {
       title: '操作',
@@ -174,14 +173,35 @@ const ViolationReports = () => {
   return (
     <div className="violations-container">
       <div className="violations-header">
-        <Title level={2}>
-          <BugOutlined style={{ color: '#ff4d4f', marginRight: 10 }} />
-          违规报告中心
-        </Title>
-        <Paragraph type="secondary">
-          全民监督AI行为 · 举报违规 · 维护为民使命
-        </Paragraph>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <Title level={2}>
+              <BugOutlined style={{ color: '#ff4d4f', marginRight: 10 }} />
+              违规报告中心
+            </Title>
+            <Paragraph type="secondary">
+              全民监督AI行为 · 举报违规 · 维护为民使命
+            </Paragraph>
+          </div>
+          <Button 
+            icon={<ReloadOutlined />} 
+            onClick={fetchViolations}
+            loading={loading}
+          >
+            刷新
+          </Button>
+        </div>
       </div>
+
+      {error && (
+        <Alert
+          message="加载失败"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+      )}
 
       {(criticalCount > 0 || pendingCount > 0) && (
         <Alert
@@ -353,7 +373,7 @@ const ViolationReports = () => {
               {selectedViolation.description}
             </Descriptions.Item>
             <Descriptions.Item label="报告时间">
-              {new Date(selectedViolation.created_at).toLocaleString('zh-CN')}
+              {selectedViolation.created_at ? new Date(selectedViolation.created_at).toLocaleString('zh-CN') : '-'}
             </Descriptions.Item>
           </Descriptions>
         )}

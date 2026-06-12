@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-众生智枢 - 全民民主监督平台后端
-ZhongSheng ZhiShu - Public Democratic Oversight Platform Backend
+众生智枢 - 全民民主监督平台后端 (修复版)
+ZhongSheng ZhiShu - Public Democratic Oversight Platform Backend (Fixed)
 """
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event, Index, UniqueConstraint, text
 from sqlalchemy.orm import sessionmaker, Session
-from datetime import datetime
+from sqlalchemy.pool import StaticPool
+from datetime import datetime, timezone
+from typing import Generator, Optional
 import json
 import os
 from pathlib import Path
+from collections import defaultdict
+from functools import wraps
+import time
 
 # 导入数据模型
 from models import (
@@ -36,48 +41,122 @@ from core import (
 )
 
 # ============================================================================
-# 初始化应用
+# Rate Limiting Middleware
 # ============================================================================
 
-app = FastAPI(
-    title="众生智枢 · 全民民主监督平台",
-    description="Public-First AI Democratic Oversight Platform",
-    version="1.0.0"
-)
+class RateLimiter:
+    """基于IP的请求频率限制"""
+    
+    def __init__(self, max_requests: int = 30, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.requests: dict = defaultdict(list)
+    
+    def is_allowed(self, client_ip: str) -> bool:
+        """检查是否允许请求"""
+        now = time.time()
+        # 清理过期记录
+        self.requests[client_ip] = [
+            t for t in self.requests[client_ip] 
+            if now - t < self.window_seconds
+        ]
+        
+        if len(self.requests[client_ip]) >= self.max_requests:
+            return False
+        
+        self.requests[client_ip].append(now)
+        return True
+    
+    def get_remaining(self, client_ip: str) -> int:
+        """获取剩余请求次数"""
+        now = time.time()
+        self.requests[client_ip] = [
+            t for t in self.requests[client_ip] 
+            if now - t < self.window_seconds
+        ]
+        return max(0, self.max_requests - len(self.requests[client_ip]))
 
-# CORS中间件配置
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+rate_limiter = RateLimiter(max_requests=30, window_seconds=60)
+
+async def rate_limit_middleware(request: Request, call_next):
+    """Rate limiting中间件"""
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # 只对POST请求进行限流
+    if request.method == "POST":
+        if not rate_limiter.is_allowed(client_ip):
+            return Response(
+                content=json.dumps({
+                    "detail": "请求过于频繁，请稍后再试",
+                    "error_code": "RATE_LIMIT_EXCEEDED",
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }),
+                status_code=429,
+                media_type="application/json"
+            )
+    
+    response = await call_next(request)
+    return response
 
 # ============================================================================
 # 数据库配置
 # ============================================================================
 
-DATA_DIR = Path("/app/data") if os.path.exists("/app") else Path("./data")
-DATA_DIR.mkdir(exist_ok=True)
+def get_database_url() -> str:
+    """获取数据库URL，优先使用PostgreSQL"""
+    # 1. 优先使用DATABASE_URL环境变量
+    if os.getenv("DATABASE_URL"):
+        return os.getenv("DATABASE_URL")
+    
+    # 2. 检查是否明确配置使用PostgreSQL
+    if os.getenv("DB_TYPE", "").lower() == "postgres":
+        pg_host = os.getenv("POSTGRES_HOST", "localhost")
+        pg_port = os.getenv("POSTGRES_PORT", "5432")
+        pg_user = os.getenv("POSTGRES_USER", "postgres")
+        pg_password = os.getenv("POSTGRES_PASSWORD", "postgres")
+        pg_db = os.getenv("POSTGRES_DB", "zhongsheng")
+        return f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db}"
+    
+    # 3. 降级使用SQLite（开发模式）
+    DATA_DIR = Path("/app/data") if os.path.exists("/app") else Path("./data")
+    DATA_DIR.mkdir(exist_ok=True)
+    return f"sqlite:///{DATA_DIR}/zhongsheng.db"
 
-DATABASE_URL = f"sqlite:///{DATA_DIR}/zhongsheng.db"
+def create_engine_with_settings(database_url: str):
+    """根据数据库类型创建engine"""
+    if database_url.startswith("sqlite"):
+        # SQLite配置：启用WAL模式
+        engine = create_engine(
+            database_url,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+            echo=False
+        )
+        
+        @event.listens_for(engine, "connect")
+        def set_sqlite_pragma(dbapi_conn, connection_record):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+        
+        return engine
+    else:
+        # PostgreSQL配置
+        return create_engine(
+            database_url,
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            echo=False
+        )
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
-
+DATABASE_URL = get_database_url()
+engine = create_engine_with_settings(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 创建表
-Base.metadata.create_all(bind=engine)
-
-# ============================================================================
-# 依赖注入
-# ============================================================================
-
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     """获取数据库会话"""
     db = SessionLocal()
     try:
@@ -85,11 +164,75 @@ def get_db():
     finally:
         db.close()
 
+# 创建表
+Base.metadata.create_all(bind=engine)
+
+# ============================================================================
+# 初始化应用
+# ============================================================================
+
+app = FastAPI(
+    title="众生智枢 · 全民民主监督平台",
+    description="Public-First AI Democratic Oversight Platform",
+    version="1.1.0"
+)
+
+# CORS配置：从环境变量读取
+def get_cors_origins() -> list:
+    """获取CORS允许的来源"""
+    cors_env = os.getenv("CORS_ORIGINS", "")
+    if cors_env:
+        return [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+    # 默认允许所有来源（开发模式）
+    return ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 添加rate limiting中间件
+app.middleware("http")(rate_limit_middleware)
+
 # 初始化核心模块
 mission = PublicFirstAIMission()
 value_assessment = PublicInterestValueAssessment()
 constraint_engine = DecisionConstraintEngine()
 oversight = PublicOversightInterface()
+
+# ============================================================================
+# 全局异常处理
+# ============================================================================
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """HTTP异常处理"""
+    return Response(
+        content=json.dumps({
+            "detail": exc.detail,
+            "status_code": exc.status_code,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }, ensure_ascii=False),
+        status_code=exc.status_code,
+        media_type="application/json"
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """通用异常处理"""
+    # 记录到审计日志
+    return Response(
+        content=json.dumps({
+            "detail": "服务器内部错误",
+            "error_code": "INTERNAL_ERROR",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }, ensure_ascii=False),
+        status_code=500,
+        media_type="application/json"
+    )
 
 # ============================================================================
 # API路由 - 健康检查
@@ -100,8 +243,10 @@ async def health_check():
     """健康检查端点"""
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "system": "众生智枢民主监督平台"
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "system": "众生智枢民主监督平台",
+        "version": "1.1.0",
+        "database": "postgresql" if DATABASE_URL.startswith("postgresql") else "sqlite"
     }
 
 # ============================================================================
@@ -120,7 +265,7 @@ async def create_decision(
     """
     try:
         # 1. 检查硬约束
-        decision_dict = decision_data.dict()
+        decision_dict = decision_data.model_dump()
         passes_constraints, violations = constraint_engine.check_hard_constraints(
             decision_dict
         )
@@ -134,12 +279,12 @@ async def create_decision(
             
             # 记录紧急警报
             alert = EmergencyAlert(
-                decision_id="emergency_" + str(datetime.now().timestamp()),
+                decision_id="emergency_" + str(datetime.now(timezone.utc).timestamp()),
                 violation_type=violations[0] if violations else "unknown",
                 severity="CRITICAL",
-                description=json.dumps(emergency_response),
+                description=json.dumps(emergency_response, ensure_ascii=False),
                 status="ACTIVE",
-                created_at=datetime.now()
+                created_at=datetime.now(timezone.utc)
             )
             db.add(alert)
             db.commit()
@@ -175,7 +320,7 @@ async def create_decision(
             rationale=rationale,
             constraints_passed=True,
             is_public=True,
-            created_at=datetime.now()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(db_decision)
         db.commit()
@@ -187,7 +332,7 @@ async def create_decision(
             action="DECISION_CREATED",
             description=f"新决策已创建并通过审查: {decision_data.action}",
             severity="INFO",
-            timestamp=datetime.now()
+            timestamp=datetime.now(timezone.utc)
         )
         db.add(audit_log)
         db.commit()
@@ -216,7 +361,7 @@ async def list_decisions(
     """
     decisions = db.query(AIDecision).filter(
         AIDecision.is_public == True
-    ).offset(skip).limit(limit).all()
+    ).order_by(AIDecision.created_at.desc()).offset(skip).limit(limit).all()
     
     total = db.query(AIDecision).filter(
         AIDecision.is_public == True
@@ -228,9 +373,10 @@ async def list_decisions(
                 "id": d.id,
                 "action": d.action,
                 "description": d.description,
+                "beneficiaries": d.beneficiaries,
                 "public_value_score": d.public_value_score,
                 "constraints_passed": d.constraints_passed,
-                "created_at": d.created_at.isoformat()
+                "created_at": d.created_at.isoformat() if d.created_at else None
             }
             for d in decisions
         ],
@@ -262,7 +408,8 @@ async def get_decision(
         "public_value_score": decision.public_value_score,
         "rationale": decision.rationale,
         "constraints_passed": decision.constraints_passed,
-        "created_at": decision.created_at.isoformat()
+        "is_public": decision.is_public,
+        "created_at": decision.created_at.isoformat() if decision.created_at else None
     }
 
 # ============================================================================
@@ -281,16 +428,32 @@ async def create_vote(
     - EMERGENCY_VETO: 紧急否决（投诉违反铁律）
     - DECISION_REVIEW: 决策审查
     - SANCTION_VOTE: 制裁执行
+    - POLICY_CHANGE: 政策变更
     """
     try:
+        # 防重复投票检查：同一投票者对同一决策的同一选择只能投一次
+        existing_vote = db.query(PublicVote).filter(
+            PublicVote.voter_id == vote_data.voter_id,
+            PublicVote.decision_id == vote_data.decision_id,
+            PublicVote.vote_type == vote_data.vote_type.value if hasattr(vote_data.vote_type, 'value') else vote_data.vote_type
+        ).first()
+        
+        if existing_vote:
+            raise HTTPException(
+                status_code=409,
+                detail="您已经对这项决策投过票了，不能重复投票"
+            )
+        
+        vote_type_value = vote_data.vote_type.value if hasattr(vote_data.vote_type, 'value') else vote_data.vote_type
+        
         vote = PublicVote(
-            vote_type=vote_data.vote_type,
+            vote_type=vote_type_value,
             decision_id=vote_data.decision_id,
             voter_id=vote_data.voter_id,
-            vote_choice=vote_data.vote_choice,  # "approve", "reject", "abstain"
+            vote_choice=vote_data.vote_choice.value if hasattr(vote_data.vote_choice, 'value') else vote_data.vote_choice,
             reason=vote_data.reason,
             is_anonymous=vote_data.is_anonymous,
-            created_at=datetime.now()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(vote)
         db.commit()
@@ -300,9 +463,9 @@ async def create_vote(
         audit_log = AuditLog(
             vote_id=vote.id,
             action="VOTE_CREATED",
-            description=f"新投票已创建: {vote_data.vote_type}",
+            description=f"新投票已创建: {vote_type_value}",
             severity="INFO",
-            timestamp=datetime.now()
+            timestamp=datetime.now(timezone.utc)
         )
         db.add(audit_log)
         db.commit()
@@ -310,8 +473,10 @@ async def create_vote(
         return {
             "vote_id": vote.id,
             "status": "recorded",
-            "created_at": vote.created_at.isoformat()
+            "created_at": vote.created_at.isoformat() if vote.created_at else None
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -341,6 +506,50 @@ async def get_vote_statistics(
         "approval_rate": (approve_count / total * 100) if total > 0 else 0
     }
 
+@app.get("/api/votes/overview")
+async def get_votes_overview(db: Session = Depends(get_db)):
+    """
+    获取所有决策的投票概览（修复：不再只看第一条决策）
+    """
+    # 获取所有决策
+    decisions = db.query(AIDecision).filter(
+        AIDecision.is_public == True
+    ).all()
+    
+    overview = []
+    for decision in decisions:
+        votes = db.query(PublicVote).filter(
+            PublicVote.decision_id == decision.id
+        ).all()
+        
+        approve_count = len([v for v in votes if v.vote_choice == "approve"])
+        reject_count = len([v for v in votes if v.vote_choice == "reject"])
+        abstain_count = len([v for v in votes if v.vote_choice == "abstain"])
+        total = len(votes)
+        
+        overview.append({
+            "decision_id": decision.id,
+            "decision_action": decision.action,
+            "total_votes": total,
+            "approve": approve_count,
+            "reject": reject_count,
+            "abstain": abstain_count,
+            "approval_rate": (approve_count / total * 100) if total > 0 else 0
+        })
+    
+    # 汇总统计
+    total_votes = sum(item["total_votes"] for item in overview)
+    total_approve = sum(item["approve"] for item in overview)
+    
+    return {
+        "decisions": overview,
+        "summary": {
+            "total_decisions": len(overview),
+            "total_votes": total_votes,
+            "overall_approval_rate": (total_approve / total_votes * 100) if total_votes > 0 else 0
+        }
+    }
+
 # ============================================================================
 # API路由 - 违反报告
 # ============================================================================
@@ -354,29 +563,31 @@ async def report_violation(
     提交违反铁律的投诉
     """
     try:
+        severity_value = violation_data.severity.value if hasattr(violation_data.severity, 'value') else violation_data.severity
+        
         violation = ViolationReport(
             decision_id=violation_data.decision_id,
             violated_law=violation_data.violated_law,
             description=violation_data.description,
-            severity=violation_data.severity,  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+            severity=severity_value,
             reporter_id=violation_data.reporter_id,
             is_anonymous=violation_data.is_anonymous,
             status="PENDING_REVIEW",
-            created_at=datetime.now()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(violation)
         db.commit()
         db.refresh(violation)
         
         # 如果是CRITICAL，自动触发紧急熔断
-        if violation_data.severity == "CRITICAL":
+        if severity_value == "CRITICAL":
             alert = EmergencyAlert(
-                decision_id=str(violation_data.decision_id),
+                decision_id=str(violation_data.decision_id) if violation_data.decision_id else "unknown",
                 violation_type=violation_data.violated_law,
                 severity="CRITICAL",
                 description=violation_data.description,
                 status="ACTIVE",
-                created_at=datetime.now()
+                created_at=datetime.now(timezone.utc)
             )
             db.add(alert)
             db.commit()
@@ -386,8 +597,8 @@ async def report_violation(
             violation_id=violation.id,
             action="VIOLATION_REPORTED",
             description=f"违反报告已提交: {violation_data.violated_law}",
-            severity=violation_data.severity,
-            timestamp=datetime.now()
+            severity=severity_value,
+            timestamp=datetime.now(timezone.utc)
         )
         db.add(audit_log)
         db.commit()
@@ -395,7 +606,7 @@ async def report_violation(
         return {
             "violation_id": violation.id,
             "status": "submitted",
-            "created_at": violation.created_at.isoformat()
+            "created_at": violation.created_at.isoformat() if violation.created_at else None
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -409,18 +620,24 @@ async def list_violations(
     """
     获取所有违反报告
     """
-    violations = db.query(ViolationReport).offset(skip).limit(limit).all()
+    violations = db.query(ViolationReport).order_by(
+        ViolationReport.created_at.desc()
+    ).offset(skip).limit(limit).all()
+    
     total = db.query(ViolationReport).count()
     
     return {
         "violations": [
             {
                 "id": v.id,
+                "decision_id": v.decision_id,
                 "violated_law": v.violated_law,
                 "description": v.description,
                 "severity": v.severity,
                 "status": v.status,
-                "created_at": v.created_at.isoformat()
+                "reporter_id": v.reporter_id if not v.is_anonymous else "anonymous",
+                "is_anonymous": v.is_anonymous,
+                "created_at": v.created_at.isoformat() if v.created_at else None
             }
             for v in violations
         ],
@@ -452,10 +669,13 @@ async def get_audit_logs(
         "logs": [
             {
                 "id": log.id,
+                "decision_id": log.decision_id,
+                "vote_id": log.vote_id,
+                "violation_id": log.violation_id,
                 "action": log.action,
                 "description": log.description,
                 "severity": log.severity,
-                "timestamp": log.timestamp.isoformat()
+                "timestamp": log.timestamp.isoformat() if log.timestamp else None
             }
             for log in logs
         ],
@@ -486,7 +706,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         "total_violations": total_violations,
         "active_alerts": active_alerts,
         "average_public_value_score": round(float(avg_score), 2),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 # ============================================================================
@@ -500,20 +720,58 @@ async def get_emergency_alerts(db: Session = Depends(get_db)):
     """
     alerts = db.query(EmergencyAlert).filter(
         EmergencyAlert.status == "ACTIVE"
-    ).all()
+    ).order_by(EmergencyAlert.created_at.desc()).all()
     
     return {
         "active_alerts": len(alerts),
         "alerts": [
             {
                 "id": alert.id,
+                "decision_id": alert.decision_id,
                 "violation_type": alert.violation_type,
                 "severity": alert.severity,
                 "description": alert.description,
-                "created_at": alert.created_at.isoformat()
+                "status": alert.status,
+                "created_at": alert.created_at.isoformat() if alert.created_at else None
             }
             for alert in alerts
         ]
+    }
+
+@app.post("/api/emergency-alerts/{alert_id}/resolve")
+async def resolve_alert(
+    alert_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    解决紧急警报
+    """
+    alert = db.query(EmergencyAlert).filter(
+        EmergencyAlert.id == alert_id
+    ).first()
+    
+    if not alert:
+        raise HTTPException(status_code=404, detail="警报未找到")
+    
+    alert.status = "RESOLVED"
+    alert.resolved_at = datetime.now(timezone.utc)
+    db.commit()
+    
+    # 记录审计日志
+    audit_log = AuditLog(
+        violation_id=alert_id,
+        action="ALERT_RESOLVED",
+        description=f"紧急警报已解决: {alert.violation_type}",
+        severity="INFO",
+        timestamp=datetime.now(timezone.utc)
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {
+        "alert_id": alert_id,
+        "status": "resolved",
+        "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at else None
     }
 
 if __name__ == "__main__":

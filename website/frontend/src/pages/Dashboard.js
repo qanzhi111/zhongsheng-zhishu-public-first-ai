@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Progress, Alert, List, Tag, Timeline, Divider, Typography, Space } from 'antd';
+import { Card, Row, Col, Statistic, Progress, Alert, List, Tag, Timeline, Divider, Typography, Space, Button } from 'antd';
 import { 
   SafetyCertificateOutlined, 
   TeamOutlined, 
   FileProtectOutlined, 
   AlertTriangleOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
-import { Line, Column, Pie } from '@ant-design/charts';
+import { Line } from '@ant-design/charts';
+import { getDashboardStats, getDecisions } from '../api/client';
 import './Dashboard.css';
 
 const { Title, Text, Paragraph } = Typography;
@@ -23,6 +25,7 @@ const Dashboard = () => {
   });
   const [recentDecisions, setRecentDecisions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -31,18 +34,21 @@ const Dashboard = () => {
   }, []);
 
   const fetchDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      const response = await fetch('http://localhost:8000/api/dashboard-stats');
-      const data = await response.json();
-      setStats(data);
+      const [statsData, decisionsData] = await Promise.all([
+        getDashboardStats(),
+        getDecisions(0, 10)
+      ]);
       
-      const decisionsResponse = await fetch('http://localhost:8000/api/decisions?limit=10');
-      const decisionsData = await decisionsResponse.json();
+      setStats(statsData);
       setRecentDecisions(decisionsData.decisions || []);
-      
       setLoading(false);
-    } catch (error) {
-      console.error('获取仪表板数据失败:', error);
+    } catch (err) {
+      console.error('获取仪表板数据失败:', err);
+      setError(err.message || '获取数据失败，请检查网络连接或后端服务是否正常');
       setLoading(false);
     }
   };
@@ -63,7 +69,7 @@ const Dashboard = () => {
 
   const lineChartData = recentDecisions.map((d, index) => ({
     index: index + 1,
-    score: d.public_value_score
+    score: d.public_value_score || 0
   }));
 
   const lineConfig = {
@@ -79,14 +85,40 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <Title level={2}>
-          <SafetyCertificateOutlined style={{ color: '#1890ff', marginRight: 10 }} />
-          众生智枢 · 全民民主监督平台
-        </Title>
-        <Paragraph type="secondary">
-          实时监控AI决策 · 全民民主监督 · 透明可审计
-        </Paragraph>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <Title level={2}>
+              <SafetyCertificateOutlined style={{ color: '#1890ff', marginRight: 10 }} />
+              众生智枢 · 全民民主监督平台
+            </Title>
+            <Paragraph type="secondary">
+              实时监控AI决策 · 全民民主监督 · 透明可审计
+            </Paragraph>
+          </div>
+          <Button 
+            icon={<ReloadOutlined />} 
+            onClick={fetchDashboardData}
+            loading={loading}
+          >
+            刷新数据
+          </Button>
+        </div>
       </div>
+
+      {error && (
+        <Alert
+          message="数据加载失败"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 24 }}
+          action={
+            <Button size="small" type="primary" onClick={fetchDashboardData}>
+              重试
+            </Button>
+          }
+        />
+      )}
 
       {stats.active_alerts > 0 && (
         <Alert
@@ -245,9 +277,9 @@ const Dashboard = () => {
                   />
                   <div style={{ minWidth: 120 }}>
                     <Progress 
-                      percent={item.public_value_score} 
+                      percent={item.public_value_score || 0} 
                       size="small"
-                      strokeColor={getScoreColor(item.public_value_score)}
+                      strokeColor={getScoreColor(item.public_value_score || 0)}
                       format={(p) => `${p}%`}
                     />
                   </div>

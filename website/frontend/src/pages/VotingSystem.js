@@ -5,9 +5,11 @@ import {
   CheckCircleOutlined, 
   CloseCircleOutlined,
   PlusOutlined,
-  BarChartOutlined
+  BarChartOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
-import { Pie, Column } from '@ant-design/charts';
+import { Pie } from '@ant-design/charts';
+import { getDecisions, getVotesOverview, getVoteStatistics, createVote } from '../api/client';
 import './VotingSystem.css';
 
 const { Title, Text, Paragraph } = Typography;
@@ -15,59 +17,70 @@ const { TextArea } = Input;
 const { Option } = Select;
 
 const VotingSystem = () => {
-  const [votes, setVotes] = useState([]);
+  const [decisions, setDecisions] = useState([]);
+  const [votesOverview, setVotesOverview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const [selectedDecisionId, setSelectedDecisionId] = useState(null);
   const [statistics, setStatistics] = useState(null);
 
   useEffect(() => {
-    fetchVotes();
+    fetchData();
   }, []);
 
-  const fetchVotes = async () => {
+  const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch('http://localhost:8000/api/decisions');
-      const data = await response.json();
+      // 获取决策列表
+      const decisionsData = await getDecisions(0, 100);
+      setDecisions(decisionsData.decisions || []);
       
-      if (data.decisions && data.decisions.length > 0) {
-        const firstDecisionId = data.decisions[0].id;
-        const statsResponse = await fetch(`http://localhost:8000/api/votes/statistics/${firstDecisionId}`);
-        const statsData = await statsResponse.json();
-        setStatistics(statsData);
+      // 获取所有决策的投票概览（修复：不再只看第一条决策）
+      const overviewData = await getVotesOverview();
+      setVotesOverview(overviewData);
+      
+      // 默认选择第一个决策的统计
+      if (overviewData?.decisions?.length > 0) {
+        setSelectedDecisionId(overviewData.decisions[0].decision_id);
+        setStatistics(overviewData.decisions[0]);
       }
-    } catch (error) {
-      console.error('获取投票数据失败:', error);
+    } catch (err) {
+      console.error('获取投票数据失败:', err);
+      setError(err.message || '获取数据失败');
     }
     setLoading(false);
   };
 
+  const handleDecisionChange = (decisionId) => {
+    setSelectedDecisionId(decisionId);
+    const decisionStats = votesOverview?.decisions?.find(d => d.decision_id === decisionId);
+    if (decisionStats) {
+      setStatistics(decisionStats);
+    }
+  };
+
   const handleCreateVote = async (values) => {
     try {
-      const response = await fetch('http://localhost:8000/api/votes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...values,
-          decision_id: values.decision_id || 1,
-          voter_id: values.voter_id || `voter_${Date.now()}`,
-          vote_choice: values.vote_choice,
-          is_anonymous: values.is_anonymous || false
-        }),
-      });
-
-      if (response.ok) {
-        message.success('投票成功！');
-        setModalVisible(false);
-        form.resetFields();
-        fetchVotes();
-      } else {
-        message.error('投票失败，请重试');
-      }
-    } catch (error) {
-      message.error('提交投票时出错');
-      console.error(error);
+      const voteData = {
+        vote_type: values.vote_type,
+        decision_id: values.decision_id ? parseInt(values.decision_id, 10) : null,
+        voter_id: values.voter_id || `voter_${Date.now()}`,
+        vote_choice: values.vote_choice,
+        reason: values.reason,
+        is_anonymous: values.is_anonymous || false
+      };
+      
+      await createVote(voteData);
+      message.success('投票成功！');
+      setModalVisible(false);
+      form.resetFields();
+      fetchData(); // 刷新数据
+    } catch (err) {
+      console.error('提交投票失败:', err);
+      message.error(err.message || '投票失败，请重试');
     }
   };
 
@@ -108,14 +121,35 @@ const VotingSystem = () => {
   return (
     <div className="voting-container">
       <div className="voting-header">
-        <Title level={2}>
-          <TeamOutlined style={{ color: '#722ed1', marginRight: 10 }} />
-          民主投票系统
-        </Title>
-        <Paragraph type="secondary">
-          全民参与AI治理 · 民主决策 · 公开透明
-        </Paragraph>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <Title level={2}>
+              <TeamOutlined style={{ color: '#722ed1', marginRight: 10 }} />
+              民主投票系统
+            </Title>
+            <Paragraph type="secondary">
+              全民参与AI治理 · 民主决策 · 公开透明
+            </Paragraph>
+          </div>
+          <Button 
+            icon={<ReloadOutlined />} 
+            onClick={fetchData}
+            loading={loading}
+          >
+            刷新
+          </Button>
+        </div>
       </div>
+
+      {error && (
+        <Alert
+          message="加载失败"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+      )}
 
       <Alert
         message="民主参与"
@@ -134,16 +168,26 @@ const VotingSystem = () => {
         >
           创建投票
         </Button>
-        <Button 
-          icon={<BarChartOutlined />}
-          onClick={fetchVotes}
-          size="large"
-        >
-          刷新统计
-        </Button>
       </div>
 
       <Card title="投票统计" style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 16 }}>
+          <Text strong>选择决策查看投票详情：</Text>
+          <Select
+            style={{ width: 300, marginLeft: 8 }}
+            placeholder="请选择决策"
+            value={selectedDecisionId}
+            onChange={handleDecisionChange}
+            loading={loading}
+          >
+            {decisions.map(decision => (
+              <Option key={decision.id} value={decision.id}>
+                #{decision.id} - {decision.action.substring(0, 30)}{decision.action.length > 30 ? '...' : ''}
+              </Option>
+            ))}
+          </Select>
+        </div>
+        
         <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 300px', minWidth: 300 }}>
             {statistics ? (
@@ -190,6 +234,64 @@ const VotingSystem = () => {
           </div>
         </div>
       </Card>
+
+      {votesOverview && votesOverview.decisions && votesOverview.decisions.length > 0 && (
+        <Card title="所有决策投票概览" style={{ marginBottom: 24 }}>
+          <Table
+            dataSource={votesOverview.decisions}
+            rowKey="decision_id"
+            pagination={false}
+            columns={[
+              {
+                title: '决策ID',
+                dataIndex: 'decision_id',
+                key: 'decision_id',
+                width: 100,
+              },
+              {
+                title: '决策名称',
+                dataIndex: 'decision_action',
+                key: 'decision_action',
+                ellipsis: true,
+              },
+              {
+                title: '总票数',
+                dataIndex: 'total_votes',
+                key: 'total_votes',
+                width: 100,
+              },
+              {
+                title: '赞成',
+                dataIndex: 'approve',
+                key: 'approve',
+                width: 80,
+                render: (val) => <Tag color="green">{val}</Tag>,
+              },
+              {
+                title: '反对',
+                dataIndex: 'reject',
+                key: 'reject',
+                width: 80,
+                render: (val) => <Tag color="red">{val}</Tag>,
+              },
+              {
+                title: '弃权',
+                dataIndex: 'abstain',
+                key: 'abstain',
+                width: 80,
+                render: (val) => <Tag color="default">{val}</Tag>,
+              },
+              {
+                title: '赞成率',
+                dataIndex: 'approval_rate',
+                key: 'approval_rate',
+                width: 100,
+                render: (val) => `${(val || 0).toFixed(1)}%`,
+              },
+            ]}
+          />
+        </Card>
+      )}
 
       <Card title="投票类型说明">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
@@ -245,6 +347,20 @@ const VotingSystem = () => {
             is_anonymous: false
           }}
         >
+          <Form.Item
+            label="关联决策"
+            name="decision_id"
+            tooltip="选择要投票的AI决策（可选）"
+          >
+            <Select allowClear placeholder="请选择决策（可选）">
+              {decisions.map(decision => (
+                <Option key={decision.id} value={decision.id}>
+                  #{decision.id} - {decision.action.substring(0, 40)}{decision.action.length > 40 ? '...' : ''}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
           <Form.Item
             label="投票类型"
             name="vote_type"

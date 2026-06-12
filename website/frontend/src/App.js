@@ -1,1 +1,135 @@
-import React, { useState, useEffect } from 'react';\nimport { Layout, Menu, Button, Badge, Drawer } from 'antd';\nimport {\n  DashboardOutlined,\n  FileTextOutlined,\n  TeamOutlined,\n  BugOutlined,\n  AlertOutlined,\n  MenuOutlined,\n  CloseOutlined\n} from '@ant-design/icons';\nimport './App.css';\nimport Dashboard from './pages/Dashboard';\nimport Decisions from './pages/Decisions';\nimport VotingSystem from './pages/VotingSystem';\nimport ViolationReports from './pages/ViolationReports';\nimport EmergencyAlerts from './pages/EmergencyAlerts';\n\nconst { Header, Sider, Content } = Layout;\n\nfunction App() {\n  const [currentPage, setCurrentPage] = useState('dashboard');\n  const [emergencyAlerts, setEmergencyAlerts] = useState(0);\n  const [sidebarVisible, setSidebarVisible] = useState(true);\n  const [mobileDrawerVisible, setMobileDrawerVisible] = useState(false);\n\n  useEffect(() => {\n    // 实时监听紧急警报\n    const checkAlerts = async () => {\n      try {\n        const response = await fetch('http://localhost:8000/api/emergency-alerts');\n        const data = await response.json();\n        setEmergencyAlerts(data.active_alerts || 0);\n      } catch (error) {\n        console.error('Failed to fetch alerts:', error);\n      }\n    };\n\n    checkAlerts();\n    const interval = setInterval(checkAlerts, 5000);\n    return () => clearInterval(interval);\n  }, []);\n\n  const menuItems = [\n    {\n      key: 'dashboard',\n      icon: <DashboardOutlined />,\n      label: '仪表板',\n    },\n    {\n      key: 'decisions',\n      icon: <FileTextOutlined />,\n      label: 'AI决策',\n    },\n    {\n      key: 'voting',\n      icon: <TeamOutlined />,\n      label: '民主投票',\n    },\n    {\n      key: 'violations',\n      icon: <BugOutlined />,\n      label: '违反报告',\n    },\n    {\n      key: 'alerts',\n      icon: <AlertOutlined />,\n      label: (\n        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>\n          <span>紧急警报</span>\n          {emergencyAlerts > 0 && <Badge count={emergencyAlerts} style={{ backgroundColor: '#ff4d4f' }} />}\n        </div>\n      ),\n    },\n  ];\n\n  const renderContent = () => {\n    switch (currentPage) {\n      case 'dashboard':\n        return <Dashboard />;\n      case 'decisions':\n        return <Decisions />;\n      case 'voting':\n        return <VotingSystem />;\n      case 'violations':\n        return <ViolationReports />;\n      case 'alerts':\n        return <EmergencyAlerts />;\n      default:\n        return <Dashboard />;\n    }\n  };\n\n  return (\n    <Layout style={{ minHeight: '100vh' }}>\n      <Header className=\"app-header\">\n        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>\n          <div style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>\n            众生智枢 · 全民民主监督平台\n          </div>\n          <Button\n            type=\"text\"\n            icon={<MenuOutlined />}\n            style={{ display: 'none' }}\n            onClick={() => setMobileDrawerVisible(true)}\n          />\n        </div>\n      </Header>\n      <Layout>\n        <Sider width={200} theme=\"dark\" breakpoint=\"lg\" collapsedWidth={0}>\n          <div style={{ padding: '16px', color: 'white', textAlign: 'center', fontSize: '12px' }}>\n            为民服务 · 全民监督\n          </div>\n          <Menu\n            theme=\"dark\"\n            mode=\"inline\"\n            selectedKeys={[currentPage]}\n            items={menuItems}\n            onClick={(e) => {\n              setCurrentPage(e.key);\n              setMobileDrawerVisible(false);\n            }}\n          />\n        </Sider>\n        <Layout>\n          <Content style={{ padding: '24px', background: '#f0f2f5' }}>\n            {renderContent()}\n          </Content>\n        </Layout>\n      </Layout>\n    </Layout>\n  );\n}\n\nexport default App;\n
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Layout, Menu, Button, Badge } from 'antd';
+import {
+  DashboardOutlined,
+  FileTextOutlined,
+  TeamOutlined,
+  BugOutlined,
+  AlertOutlined,
+  MenuOutlined,
+} from '@ant-design/icons';
+import './App.css';
+import Dashboard from './pages/Dashboard';
+import Decisions from './pages/Decisions';
+import VotingSystem from './pages/VotingSystem';
+import ViolationReports from './pages/ViolationReports';
+import EmergencyAlerts from './pages/EmergencyAlerts';
+import { getEmergencyAlerts } from './api/client';
+
+const { Header, Sider, Content } = Layout;
+
+// 内部布局组件，包含路由逻辑
+const AppLayout = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [emergencyAlerts, setEmergencyAlerts] = useState(0);
+
+  // 获取当前选中的菜单key
+  const getSelectedKey = () => {
+    const path = location.pathname;
+    if (path === '/') return 'dashboard';
+    return path.substring(1); // 去掉开头的 /
+  };
+
+  // 监听紧急警报
+  useEffect(() => {
+    const checkAlerts = async () => {
+      try {
+        const data = await getEmergencyAlerts();
+        setEmergencyAlerts(data.active_alerts || 0);
+      } catch (error) {
+        console.error('Failed to fetch alerts:', error);
+      }
+    };
+
+    checkAlerts();
+    const interval = setInterval(checkAlerts, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const menuItems = [
+    {
+      key: 'dashboard',
+      icon: <DashboardOutlined />,
+      label: '仪表板',
+    },
+    {
+      key: 'decisions',
+      icon: <FileTextOutlined />,
+      label: 'AI决策',
+    },
+    {
+      key: 'voting',
+      icon: <TeamOutlined />,
+      label: '民主投票',
+    },
+    {
+      key: 'violations',
+      icon: <BugOutlined />,
+      label: '违反报告',
+    },
+    {
+      key: 'alerts',
+      icon: <AlertOutlined />,
+      label: (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>紧急警报</span>
+          {emergencyAlerts > 0 && <Badge count={emergencyAlerts} style={{ backgroundColor: '#ff4d4f' }} />}
+        </div>
+      ),
+    },
+  ];
+
+  const handleMenuClick = ({ key }) => {
+    navigate(`/${key === 'dashboard' ? '' : key}`);
+  };
+
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <Header className="app-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>
+            众生智枢 · 全民民主监督平台
+          </div>
+        </div>
+      </Header>
+      <Layout>
+        <Sider width={200} theme="dark" breakpoint="lg" collapsedWidth={0}>
+          <div style={{ padding: '16px', color: 'white', textAlign: 'center', fontSize: '12px' }}>
+            为民服务 · 全民监督
+          </div>
+          <Menu
+            theme="dark"
+            mode="inline"
+            selectedKeys={[getSelectedKey()]}
+            items={menuItems}
+            onClick={handleMenuClick}
+          />
+        </Sider>
+        <Layout>
+          <Content style={{ padding: '24px', background: '#f0f2f5' }}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/decisions" element={<Decisions />} />
+              <Route path="/voting" element={<VotingSystem />} />
+              <Route path="/violations" element={<ViolationReports />} />
+              <Route path="/alerts" element={<EmergencyAlerts />} />
+            </Routes>
+          </Content>
+        </Layout>
+      </Layout>
+    </Layout>
+  );
+};
+
+// App根组件
+function App() {
+  return (
+    <Router>
+      <AppLayout />
+    </Router>
+  );
+}
+
+export default App;
